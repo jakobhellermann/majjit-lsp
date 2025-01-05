@@ -16,7 +16,24 @@
       ],
       "env": {
         "SERVER_PATH": "/home/jakob/.cache/rust/debug/jjmagit-language-server"
-      }
+      },
+      "preLaunchTask": "npm: compile"
+    },
+    {
+      "type": "extensionHost",
+      "request": "launch",
+      "name": "Launch Client with extensions",
+      "runtimeExecutable": "${execPath}",
+      "args": [
+        "--extensionDevelopmentPath=${workspaceRoot}"
+      ],
+      "outFiles": [
+        "${workspaceRoot}/client/out/**/*.js"
+      ],
+      "env": {
+        "SERVER_PATH": "/home/jakob/.cache/rust/debug/jjmagit-language-server"
+      },
+      "preLaunchTask": "npm: compile"
     },
     // {
     //   "type": "node",
