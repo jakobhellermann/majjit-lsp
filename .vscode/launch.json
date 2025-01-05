@@ -5,66 +5,19 @@
     {
       "type": "extensionHost",
       "request": "launch",
-      "name": "Launch Client",
+      "name": "Launch Extension",
       "runtimeExecutable": "${execPath}",
       "args": [
-        "--disable-extensions",
-        "--extensionDevelopmentPath=${workspaceRoot}"
+        // "--disable-extensions",
+        "--extensionDevelopmentPath=${workspaceRoot}/editors/vscode"
       ],
       "outFiles": [
-        "${workspaceRoot}/client/out/**/*.js"
+        "${workspaceRoot}/editors/vscode/out/*.js"
       ],
       "env": {
         "SERVER_PATH": "/home/jakob/.cache/rust/debug/jjmagit-language-server"
       },
-      "preLaunchTask": "npm: compile"
+      "preLaunchTask": "Build Server and Extension"
     },
-    {
-      "type": "extensionHost",
-      "request": "launch",
-      "name": "Launch Client with extensions",
-      "runtimeExecutable": "${execPath}",
-      "args": [
-        "--extensionDevelopmentPath=${workspaceRoot}"
-      ],
-      "outFiles": [
-        "${workspaceRoot}/client/out/**/*.js"
-      ],
-      "env": {
-        "SERVER_PATH": "/home/jakob/.cache/rust/debug/jjmagit-language-server"
-      },
-      "preLaunchTask": "npm: compile"
-    },
-    // {
-    //   "type": "node",
-    //   "request": "attach",
-    //   "name": "Attach to Server",
-    //   "port": 6009,
-    //   "restart": true,
-    //   "outFiles": ["${workspaceRoot}/server/out/**/*.js"]
-    // },
-    {
-      "name": "Language Server E2E Test",
-      "type": "extensionHost",
-      "request": "launch",
-      "runtimeExecutable": "${execPath}",
-      "args": [
-        "--extensionDevelopmentPath=${workspaceRoot}",
-        "--extensionTestsPath=${workspaceRoot}/client/out/test/index",
-        "${workspaceRoot}/client/testFixture"
-      ],
-      "outFiles": [
-        "${workspaceRoot}/client/out/test/**/*.js"
-      ]
-    }
-  ],
-  "compounds": [
-    {
-      "name": "Client + Server",
-      "configurations": [
-        "Launch Client",
-        // "Attach to Server"
-      ]
-    }
   ]
 }
