@@ -1,14 +1,8 @@
-use std::collections::HashMap;
-
 use dashmap::DashMap;
 use log::debug;
-use nrs_language_server::completion::completion;
-use nrs_language_server::nrs_lang::{
-    parse, type_inference, Ast, ImCompleteSemanticToken, ParserResult,
-};
-use nrs_language_server::semantic_analyze::{analyze_program, IdentType, Semantic};
+use nrs_language_server::page_writer::{Page, PageWriter};
+use nrs_language_server::pages;
 use nrs_language_server::semantic_token::LEGEND_TYPE;
-use nrs_language_server::span::Span;
 use ropey::Rope;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -16,13 +10,12 @@ use tower_lsp::jsonrpc::Result;
 use tower_lsp::lsp_types::notification::Notification;
 use tower_lsp::lsp_types::*;
 use tower_lsp::{Client, LanguageServer, LspService, Server};
+
 #[derive(Debug)]
 struct Backend {
     client: Client,
-    ast_map: DashMap<String, Ast>,
-    semantic_map: DashMap<String, Semantic>,
     document_map: DashMap<String, Rope>,
-    semantic_token_map: DashMap<String, Vec<ImCompleteSemanticToken>>,
+    page_map: DashMap<String, Page>,
 }
 
 #[tower_lsp::async_trait]
@@ -32,7 +25,7 @@ impl LanguageServer for Backend {
             server_info: None,
             offset_encoding: None,
             capabilities: ServerCapabilities {
-                inlay_hint_provider: Some(OneOf::Left(true)),
+                inlay_hint_provider: None,
                 text_document_sync: Some(TextDocumentSyncCapability::Options(
                     TextDocumentSyncOptions {
                         open_close: Some(true),
@@ -43,13 +36,7 @@ impl LanguageServer for Backend {
                         ..Default::default()
                     },
                 )),
-                completion_provider: Some(CompletionOptions {
-                    resolve_provider: Some(false),
-                    trigger_characters: Some(vec![".".to_string()]),
-                    work_done_progress_options: Default::default(),
-                    all_commit_characters: None,
-                    completion_item: None,
-                }),
+                completion_provider: None,
                 execute_command_provider: Some(ExecuteCommandOptions {
                     commands: vec!["dummy.do_something".to_string()],
                     work_done_progress_options: Default::default(),
@@ -88,6 +75,7 @@ impl LanguageServer for Backend {
                     ),
                 ),
                 // definition: Some(GotoCapability::default()),
+                folding_range_provider: Some(FoldingRangeProviderCapability::Simple(true)),
                 definition_provider: Some(OneOf::Left(true)),
                 references_provider: Some(OneOf::Left(true)),
                 rename_provider: Some(OneOf::Left(true)),
@@ -110,7 +98,7 @@ impl LanguageServer for Backend {
             text: &params.text_document.text,
             version: Some(params.text_document.version),
         })
-        .await
+        .await;
     }
 
     async fn did_change(&self, params: DidChangeTextDocumentParams) {
@@ -123,7 +111,6 @@ impl LanguageServer for Backend {
     }
 
     async fn did_save(&self, params: DidSaveTextDocumentParams) {
-        dbg!(&params.text);
         if let Some(text) = params.text {
             let item = TextDocumentItem {
                 uri: params.text_document.uri,
@@ -141,9 +128,10 @@ impl LanguageServer for Backend {
 
     async fn goto_definition(
         &self,
-        params: GotoDefinitionParams,
+        _params: GotoDefinitionParams,
     ) -> Result<Option<GotoDefinitionResponse>> {
-        let definition = || -> Option<GotoDefinitionResponse> {
+        debug!("goto defintion");
+        /*let definition = || -> Option<GotoDefinitionResponse> {
             let uri = params.text_document_position_params.text_document.uri;
             let semantic = self.semantic_map.get(uri.as_str())?;
             let rope = self.document_map.get(uri.as_str())?;
@@ -174,11 +162,13 @@ impl LanguageServer for Backend {
                 )))
             })
         }();
-        Ok(definition)
+        Ok(definition)*/
+        Ok(None)
     }
 
-    async fn references(&self, params: ReferenceParams) -> Result<Option<Vec<Location>>> {
-        let reference_list = || -> Option<Vec<Location>> {
+    async fn references(&self, _params: ReferenceParams) -> Result<Option<Vec<Location>>> {
+        debug!("goto references");
+        /*let reference_list = || -> Option<Vec<Location>> {
             let uri = params.text_document_position.text_document.uri;
             let semantic = self.semantic_map.get(uri.as_str())?;
             let rope = self.document_map.get(uri.as_str())?;
@@ -199,7 +189,8 @@ impl LanguageServer for Backend {
                 .collect::<Vec<_>>();
             Some(ret)
         }();
-        Ok(reference_list)
+        Ok(reference_list)*/
+        Ok(None)
     }
 
     async fn semantic_tokens_full(
@@ -209,17 +200,18 @@ impl LanguageServer for Backend {
         let uri = params.text_document.uri.to_string();
         debug!("semantic_token_full");
         let semantic_tokens = || -> Option<Vec<SemanticToken>> {
-            let mut im_complete_tokens = self.semantic_token_map.get_mut(&uri)?;
+            let page = &mut self.page_map.get_mut(&uri)?;
+            let im_complete_tokens = &mut page.labels;
             let rope = self.document_map.get(&uri)?;
-            im_complete_tokens.sort_by(|a, b| a.start.cmp(&b.start));
+            im_complete_tokens.sort_by(|a, b| a.0.start.cmp(&b.0.start));
             let mut pre_line = 0;
             let mut pre_start = 0;
             let semantic_tokens = im_complete_tokens
                 .iter()
-                .filter_map(|token| {
-                    let line = rope.try_byte_to_line(token.start).ok()? as u32;
+                .filter_map(|&(ref range, token_type)| {
+                    let line = rope.try_byte_to_line(range.start).ok()? as u32;
                     let first = rope.try_line_to_char(line as usize).ok()? as u32;
-                    let start = rope.try_byte_to_char(token.start).ok()? as u32 - first;
+                    let start = rope.try_byte_to_char(range.start).ok()? as u32 - first;
                     let delta_line = line - pre_line;
                     let delta_start = if delta_line == 0 {
                         start - pre_start
@@ -229,8 +221,8 @@ impl LanguageServer for Backend {
                     let ret = Some(SemanticToken {
                         delta_line,
                         delta_start,
-                        length: token.length as u32,
-                        token_type: token.token_type as u32,
+                        length: range.len() as u32,
+                        token_type: token_type as u32,
                         token_modifiers_bitset: 0,
                     });
                     pre_line = line;
@@ -255,29 +247,30 @@ impl LanguageServer for Backend {
     ) -> Result<Option<SemanticTokensRangeResult>> {
         let uri = params.text_document.uri.to_string();
         let semantic_tokens = || -> Option<Vec<SemanticToken>> {
-            let im_complete_tokens = self.semantic_token_map.get(&uri)?;
+            let page = self.page_map.get(&uri)?;
             let rope = self.document_map.get(&uri)?;
-            let mut pre_line = 0;
-            let mut pre_start = 0;
-            let semantic_tokens = im_complete_tokens
+            let mut prev_line = 0;
+            let mut prev_start = 0;
+            let semantic_tokens = page
+                .labels
                 .iter()
                 .filter_map(|token| {
-                    let line = rope.try_byte_to_line(token.start).ok()? as u32;
+                    let line = rope.try_byte_to_line(token.0.start).ok()? as u32;
                     let first = rope.try_line_to_char(line as usize).ok()? as u32;
-                    let start = rope.try_byte_to_char(token.start).ok()? as u32 - first;
+                    let start = rope.try_byte_to_char(token.0.start).ok()? as u32 - first;
                     let ret = Some(SemanticToken {
-                        delta_line: line - pre_line,
-                        delta_start: if start >= pre_start {
-                            start - pre_start
+                        delta_line: line - prev_line,
+                        delta_start: if start >= prev_start {
+                            start - prev_start
                         } else {
                             start
                         },
-                        length: token.length as u32,
-                        token_type: token.token_type as u32,
+                        length: token.0.len() as u32,
+                        token_type: token.1 as u32,
                         token_modifiers_bitset: 0,
                     });
-                    pre_line = line;
-                    pre_start = start;
+                    prev_line = line;
+                    prev_start = start;
                     ret
                 })
                 .collect::<Vec<_>>();
@@ -291,12 +284,43 @@ impl LanguageServer for Backend {
         }))
     }
 
+    async fn folding_range(
+        &self,
+        params: tower_lsp::lsp_types::FoldingRangeParams,
+    ) -> Result<Option<Vec<FoldingRange>>> {
+        let uri = params.text_document.uri.to_string();
+
+        let folding_ranges = || -> Option<Vec<FoldingRange>> {
+            let page = self.page_map.get(&uri)?;
+            let rope = self.document_map.get(&uri)?;
+            let folding_ranges = page
+                .folding_ranges
+                .iter()
+                .filter_map(|(range, _)| {
+                    let start_line = rope.try_byte_to_line(range.start).ok()? as u32;
+                    let end_line = rope.try_byte_to_line(range.end).ok()? as u32;
+                    Some(FoldingRange {
+                        start_line,
+                        start_character: None,
+                        end_line,
+                        end_character: None,
+                        kind: Some(FoldingRangeKind::Region),
+                        collapsed_text: None,
+                    })
+                })
+                .collect::<Vec<_>>();
+            Some(folding_ranges)
+        }();
+
+        Ok(folding_ranges)
+    }
+
     async fn inlay_hint(
         &self,
-        params: tower_lsp::lsp_types::InlayHintParams,
+        _params: tower_lsp::lsp_types::InlayHintParams,
     ) -> Result<Option<Vec<InlayHint>>> {
         debug!("inlay hint");
-        let uri = &params.text_document.uri;
+        /*let uri = &params.text_document.uri;
         let mut hashmap = HashMap::new();
         if let Some(ast) = self.ast_map.get(uri.as_str()) {
             ast.iter().for_each(|(func, _)| {
@@ -350,11 +374,12 @@ impl LanguageServer for Backend {
             })
             .collect::<Vec<_>>();
 
-        Ok(Some(inlay_hint_list))
+        Ok(Some(inlay_hint_list))*/
+        Ok(None)
     }
 
-    async fn completion(&self, params: CompletionParams) -> Result<Option<CompletionResponse>> {
-        let uri = params.text_document_position.text_document.uri;
+    async fn completion(&self, _params: CompletionParams) -> Result<Option<CompletionResponse>> {
+        /*let uri = params.text_document_position.text_document.uri;
         let position = params.text_document_position.position;
         let completions = || -> Option<Vec<CompletionItem>> {
             let rope = self.document_map.get(&uri.to_string())?;
@@ -399,11 +424,13 @@ impl LanguageServer for Backend {
             }
             Some(ret)
         }();
-        Ok(completions.map(CompletionResponse::Array))
+        Ok(completions.map(CompletionResponse::Array))*/
+        Ok(None)
     }
 
-    async fn rename(&self, params: RenameParams) -> Result<Option<WorkspaceEdit>> {
-        let workspace_edit = || -> Option<WorkspaceEdit> {
+    async fn rename(&self, _params: RenameParams) -> Result<Option<WorkspaceEdit>> {
+        debug!("rename");
+        /*let workspace_edit = || -> Option<WorkspaceEdit> {
             let uri = params.text_document_position.text_document.uri;
             let semantic = self.semantic_map.get(uri.as_str())?;
             let rope = self.document_map.get(uri.as_str())?;
@@ -429,7 +456,8 @@ impl LanguageServer for Backend {
                 WorkspaceEdit::new(map)
             })
         }();
-        Ok(workspace_edit)
+        Ok(workspace_edit)*/
+        Ok(None)
     }
 
     async fn did_change_configuration(&self, _: DidChangeConfigurationParams) {
@@ -456,6 +484,7 @@ impl LanguageServer for Backend {
         Ok(None)
     }
 }
+
 #[derive(Debug, Deserialize, Serialize)]
 struct InlayHintParams {
     path: String,
@@ -470,89 +499,24 @@ impl Notification for CustomNotification {
 struct TextDocumentItem<'a> {
     uri: Url,
     text: &'a str,
+    #[expect(dead_code)]
     version: Option<i32>,
 }
 
 impl Backend {
     async fn on_change(&self, params: TextDocumentItem<'_>) {
-        dbg!(&params.version);
         let rope = ropey::Rope::from_str(params.text);
-        self.document_map
-            .insert(params.uri.to_string(), rope.clone());
-        let ParserResult {
-            ast,
-            parse_errors,
-            semantic_tokens,
-        } = parse(params.text);
-        let mut diagnostics = parse_errors
-            .into_iter()
-            .filter_map(|item| {
-                let (message, span) = match item.reason() {
-                    chumsky::error::SimpleReason::Unclosed { span, delimiter } => {
-                        (format!("Unclosed delimiter {}", delimiter), span.clone())
-                    }
-                    chumsky::error::SimpleReason::Unexpected => (
-                        format!(
-                            "{}, expected {}",
-                            if item.found().is_some() {
-                                "Unexpected token in input"
-                            } else {
-                                "Unexpected end of input"
-                            },
-                            if item.expected().len() == 0 {
-                                "something else".to_string()
-                            } else {
-                                item.expected()
-                                    .map(|expected| match expected {
-                                        Some(expected) => expected.to_string(),
-                                        None => "end of input".to_string(),
-                                    })
-                                    .collect::<Vec<_>>()
-                                    .join(", ")
-                            }
-                        ),
-                        item.span(),
-                    ),
-                    chumsky::error::SimpleReason::Custom(msg) => (msg.to_string(), item.span()),
-                };
 
-                let start_position = offset_to_position(span.start, &rope)?;
-                let end_position = offset_to_position(span.end, &rope)?;
-                Some(Diagnostic::new_simple(
-                    Range::new(start_position, end_position),
-                    message,
-                ))
-            })
-            .collect::<Vec<_>>();
+        self.document_map.insert(params.uri.to_string(), rope);
 
-        if let Some(ast) = ast {
-            match analyze_program(&ast) {
-                Ok(semantic) => {
-                    self.semantic_map.insert(params.uri.to_string(), semantic);
-                }
-                Err(err) => {
-                    self.semantic_token_map.remove(&params.uri.to_string());
-                    let span = err.span();
-                    let start_position = offset_to_position(span.start, &rope);
-                    let end_position = offset_to_position(span.end, &rope);
-                    let diag = start_position
-                        .and_then(|start| end_position.map(|end| (start, end)))
-                        .map(|(start, end)| {
-                            Diagnostic::new_simple(Range::new(start, end), format!("{:?}", err))
-                        });
-                    if let Some(diag) = diag {
-                        diagnostics.push(diag);
-                    }
-                }
-            };
-            self.ast_map.insert(params.uri.to_string(), ast);
-        }
+        let repo = "/home/jakob/dev/jj/jj";
+        let page_file = "/home/jakob/dev/jj/jj/.jj/stage.nrs";
+        let mut out = PageWriter::default();
+        pages::stage::render(&mut out, repo).unwrap();
 
-        self.client
-            .publish_diagnostics(params.uri.clone(), diagnostics, params.version)
-            .await;
-        self.semantic_token_map
-            .insert(params.uri.to_string(), semantic_tokens);
+        let page = out.finish();
+        std::fs::write(page_file, &page.text).unwrap();
+        self.page_map.insert(params.uri.to_string(), page);
     }
 }
 
@@ -565,16 +529,15 @@ async fn main() {
 
     let (service, socket) = LspService::build(|client| Backend {
         client,
-        ast_map: DashMap::new(),
         document_map: DashMap::new(),
-        semantic_token_map: DashMap::new(),
-        semantic_map: DashMap::new(),
+        page_map: DashMap::new(),
     })
     .finish();
 
     Server::new(stdin, stdout, socket).serve(service).await;
 }
 
+#[expect(dead_code)]
 fn offset_to_position(offset: usize, rope: &Rope) -> Option<Position> {
     let line = rope.try_char_to_line(offset).ok()?;
     let first_char_of_line = rope.try_line_to_char(line).ok()?;
@@ -582,37 +545,9 @@ fn offset_to_position(offset: usize, rope: &Rope) -> Option<Position> {
     Some(Position::new(line as u32, column as u32))
 }
 
+#[expect(dead_code)]
 fn position_to_offset(position: Position, rope: &Rope) -> Option<usize> {
     let line_char_offset = rope.try_line_to_char(position.line as usize).ok()?;
     let slice = rope.slice(0..line_char_offset + position.character as usize);
     Some(slice.len_bytes())
-}
-
-fn get_references(
-    semantic: &Semantic,
-    start: usize,
-    end: usize,
-    include_definition: bool,
-) -> Option<Vec<Span>> {
-    let interval = semantic.ident_range.find(start, end).next()?;
-    let interval_val = interval.val;
-    match interval_val {
-        IdentType::Binding(symbol_id) => {
-            let references = semantic.table.symbol_id_to_references.get(&symbol_id)?;
-            let mut reference_span_list: Vec<Span> = references
-                .iter()
-                .map(|reference_id| {
-                    semantic.table.reference_id_to_reference[*reference_id]
-                        .span
-                        .clone()
-                })
-                .collect();
-            if include_definition {
-                let symbol_range = semantic.table.symbol_id_to_span.get(symbol_id)?;
-                reference_span_list.push(symbol_range.clone());
-            }
-            Some(reference_span_list)
-        }
-        IdentType::Reference(_) => None,
-    }
 }
