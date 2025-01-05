@@ -2,9 +2,11 @@ import {
   ExtensionContext,
   window,
 } from "vscode";
+import * as vscode from "vscode";
 
 import {
   Executable,
+  ExecuteCommandParams,
   LanguageClient,
   LanguageClientOptions,
   ServerOptions,
@@ -36,10 +38,38 @@ export async function activate(context: ExtensionContext) {
 
   client = new LanguageClient("jjmagit-language-server", "jjmagit language server", serverOptions, clientOptions);
   client.start();
+
+  context.subscriptions.push(vscode.workspace.onDidOpenTextDocument(onDidOpenTextDocument));
+  context.subscriptions.push(vscode.workspace.onDidChangeTextDocument(x => onDidOpenTextDocument(x.document)));
+  context.subscriptions.push(vscode.commands.registerCommand("jjmagit.open.split", commandSplit));
 }
 
 export function deactivate(): Thenable<void> | undefined {
   if (!client) return;
 
   return client.stop();
+}
+
+async function onDidOpenTextDocument(document: vscode.TextDocument) {
+  if (document.languageId === 'jjmagit' || document.fileName.endsWith(".jjmagit") || document.fileName.endsWith(".jjmagit.git")) {
+    await vscode.commands.executeCommand("workbench.action.files.setActiveEditorReadonlyInSession");
+  }
+}
+
+async function commandSplit() {
+  let workspaceFolder = vscode.workspace.workspaceFolders[0].uri?.fsPath;
+  if (!workspaceFolder) {
+    vscode.window.showErrorMessage("No workspace folder found");
+  }
+
+  let args = {
+    command: "open.split",
+    arguments: [workspaceFolder]
+  } satisfies ExecuteCommandParams;
+  let response = await client.sendRequest("workspace/executeCommand", args) as string;
+
+  let document = await vscode.workspace.openTextDocument(vscode.Uri.file(response));
+  let editor = await vscode.window.showTextDocument(document);
+
+  await vscode.commands.executeCommand('editor.foldAll');
 }

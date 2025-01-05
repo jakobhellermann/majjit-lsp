@@ -1,3 +1,6 @@
+use std::path::Path;
+
+use anyhow::anyhow;
 use dashmap::DashMap;
 use jjmagit_language_server::page_writer::{Page, PageWriter};
 use jjmagit_language_server::pages;
@@ -6,6 +9,7 @@ use log::debug;
 use ropey::Rope;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use tokio::sync::RwLock;
 use tower_lsp::jsonrpc::Result;
 use tower_lsp::lsp_types::notification::Notification;
 use tower_lsp::lsp_types::*;
@@ -16,7 +20,11 @@ struct Backend {
     client: Client,
     document_map: DashMap<String, Rope>,
     page_map: DashMap<String, Page>,
+
+    workspace_folders: RwLock<Vec<Url>>,
 }
+
+const COMMAND_OPEN_SPLIT: &'static str = "open.split";
 
 #[tower_lsp::async_trait]
 impl LanguageServer for Backend {
@@ -38,7 +46,7 @@ impl LanguageServer for Backend {
                 )),
                 completion_provider: None,
                 execute_command_provider: Some(ExecuteCommandOptions {
-                    commands: vec!["dummy.do_something".to_string()],
+                    commands: vec![COMMAND_OPEN_SPLIT.to_string()],
                     work_done_progress_options: Default::default(),
                 }),
 
@@ -464,24 +472,64 @@ impl LanguageServer for Backend {
         debug!("configuration changed!");
     }
 
-    async fn did_change_workspace_folders(&self, _: DidChangeWorkspaceFoldersParams) {
+    async fn did_change_workspace_folders(&self, params: DidChangeWorkspaceFoldersParams) {
         debug!("workspace folders changed!");
+
+        let mut workspace_folders = self.workspace_folders.write().await;
+        workspace_folders.retain(|folder| {
+            !params
+                .event
+                .removed
+                .iter()
+                .any(|removed| &removed.uri == folder)
+        });
+        workspace_folders.extend(params.event.added.into_iter().map(|added| added.uri));
     }
 
     async fn did_change_watched_files(&self, _: DidChangeWatchedFilesParams) {
         debug!("watched files have changed!");
     }
 
-    async fn execute_command(&self, _: ExecuteCommandParams) -> Result<Option<Value>> {
+    async fn execute_command(&self, command: ExecuteCommandParams) -> Result<Option<Value>> {
         debug!("command executed!");
 
-        match self.client.apply_edit(WorkspaceEdit::default()).await {
-            Ok(res) if res.applied => self.client.log_message(MessageType::INFO, "applied").await,
-            Ok(_) => self.client.log_message(MessageType::INFO, "rejected").await,
-            Err(err) => self.client.log_message(MessageType::ERROR, err).await,
-        }
+        /*let workspace_folders = self.workspace_folders.read().await;
 
-        Ok(None)
+        let Some(workspace_folder) = workspace_folders.last() else {
+            log::error!("no workspace folders?");
+            return Ok(None);
+        };
+        let Ok(workspace_folder) = workspace_folder.to_file_path() else {
+            log::error!("workspace folder is not a file");
+            return Ok(None);
+        };*/
+
+        let result = (async || match command.command.as_str() {
+            COMMAND_OPEN_SPLIT => {
+                let workspace = command
+                    .arguments
+                    .first()
+                    .and_then(|x| x.as_str())
+                    .map(Path::new)
+                    .ok_or_else(|| {
+                        anyhow!("missing parameter, got {:?}", command.arguments.first())
+                    })?;
+
+                jjmagit_language_server::commands::open_split(&workspace)
+                    .await
+                    .map(|p| p.to_str().unwrap().to_owned())
+            }
+            other => Err(anyhow!("unknown command: {}", other)),
+        })()
+        .await;
+
+        match result {
+            Ok(res) => Ok(Some(res.into())),
+            Err(e) => {
+                log::error!("failed to run command: {e}");
+                Ok(None)
+            }
+        }
     }
 }
 
@@ -509,7 +557,7 @@ impl Backend {
 
         self.document_map.insert(params.uri.to_string(), rope);
 
-        let repo = "/home/jakob/dev/jj/jj";
+        let repo = Path::new("/home/jakob/dev/jj/jj");
         let page_file = "/home/jakob/dev/jj/jj/.jj/stage.jjmagit";
         let mut out = PageWriter::default();
         pages::stage::render(&mut out, repo).unwrap();
@@ -531,6 +579,7 @@ async fn main() {
         client,
         document_map: DashMap::new(),
         page_map: DashMap::new(),
+        workspace_folders: Default::default(),
     })
     .finish();
 

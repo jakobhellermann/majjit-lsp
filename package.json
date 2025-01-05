@@ -28,6 +28,12 @@
 				]
 			}
 		],
+		"commands": [
+			{
+				"command": "jjmagit.open.split",
+				"title": "jjmagit: Open split page"
+			}
+		],
 		"configuration": {
 			"type": "object",
 			"title": "jjmagit-language-server",
