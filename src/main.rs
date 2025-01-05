@@ -1,3 +1,4 @@
+#![allow(clippy::redundant_closure_call)]
 use std::path::{Path, PathBuf};
 
 use anyhow::anyhow;
@@ -24,7 +25,7 @@ struct Backend {
     workspace_folders: RwLock<Vec<Url>>,
 }
 
-const COMMAND_OPEN_SPLIT: &'static str = "open.split";
+const COMMAND_OPEN_SPLIT: &str = "open.split";
 
 #[tower_lsp::async_trait]
 impl LanguageServer for Backend {
@@ -518,7 +519,7 @@ impl LanguageServer for Backend {
                         anyhow!("missing parameter, got {:?}", command.arguments.first())
                     })?;
 
-                jjmagit_language_server::commands::open_split(&workspace)
+                jjmagit_language_server::commands::open_split(workspace)
                     .await
                     .map(|p| p.to_str().unwrap().to_owned())
             }

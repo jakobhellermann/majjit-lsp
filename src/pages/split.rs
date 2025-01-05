@@ -62,7 +62,7 @@ impl Page for Split {
             }
         }
 
-        writeln!(out, "")?;
+        writeln!(out)?;
 
         writeln!(out.labelled(0), "Recent commits")?;
 

@@ -114,16 +114,16 @@ pub struct ScopedWriter<'a, T> {
     data: Option<T>,
 }
 
-impl<'a, T> ScopedWriter<'a, T> {
+impl<T> ScopedWriter<'_, T> {
     pub fn write_fmt(&mut self, fmt: std::fmt::Arguments<'_>) -> std::io::Result<()> {
         self.stack.push(
-            &self.buf,
+            self.buf,
             self.data
                 .take()
                 .expect("multiple write_fmt on ScopedWriter"),
         );
         let _ = self.buf.write_fmt(fmt);
-        self.stack.pop(&self.buf);
+        self.stack.pop(self.buf);
         Ok(())
     }
 }

@@ -10,7 +10,7 @@ pub fn jj_command<'c>(command: &'c mut Command, repo: &Path) -> &'c mut Command 
 
 pub fn log(repo: &Path, revisions: &str, template: &str) -> Result<String> {
     let output = jj_command(&mut Command::new("jj"), repo)
-        .args(&["log", "--no-graph", "-r", revisions, "-T", template])
+        .args(["log", "--no-graph", "-r", revisions, "-T", template])
         .output()?;
     anyhow::ensure!(output.status.success(), String::from_utf8(output.stderr)?);
 
@@ -20,7 +20,7 @@ pub fn log(repo: &Path, revisions: &str, template: &str) -> Result<String> {
 
 pub fn show(repo: &Path, commit_id: &str) -> Result<String> {
     let output = jj_command(&mut Command::new("jj"), repo)
-        .args(&["show", commit_id, "--config", "ui.diff.format=git", "-s"])
+        .args(["show", commit_id, "--config", "ui.diff.format=git", "-s"])
         .output()?;
     anyhow::ensure!(output.status.success(), String::from_utf8(output.stderr)?);
 
@@ -32,7 +32,7 @@ pub fn diff(repo: &Path, path: &Path) -> Result<String> {
     let output = jj_command(&mut Command::new("jj"), repo)
         .arg("diff")
         .arg(path)
-        .args(&["--config", "ui.diff.format=git"])
+        .args(["--config", "ui.diff.format=git"])
         .output()?;
     anyhow::ensure!(output.status.success(), String::from_utf8(output.stderr)?);
 
@@ -42,7 +42,7 @@ pub fn diff(repo: &Path, path: &Path) -> Result<String> {
 
 pub fn workspace_root(repo: &Path) -> Result<PathBuf> {
     let output = jj_command(&mut Command::new("jj"), repo)
-        .args(&["workspace", "root"])
+        .args(["workspace", "root"])
         .output()?;
     anyhow::ensure!(output.status.success(), String::from_utf8(output.stderr)?);
 
