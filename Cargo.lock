@@ -1940,6 +1940,27 @@ dependencies = [
 ]
 
 [[package]]
+name = "jjmagit-language-server"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "dashmap 6.1.0",
+ "env_logger",
+ "im-rc",
+ "jj-cli",
+ "jj-lib",
+ "log",
+ "oxc_index",
+ "ropey",
+ "rust-lapper",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.9",
+ "tokio",
+ "tower-lsp",
+]
+
+[[package]]
 name = "jobserver"
 version = "0.1.32"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2155,27 +2176,6 @@ dependencies = [
  "libc",
  "wasi",
  "windows-sys 0.52.0",
-]
-
-[[package]]
-name = "nrs-language-server"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "dashmap 6.1.0",
- "env_logger",
- "im-rc",
- "jj-cli",
- "jj-lib",
- "log",
- "oxc_index",
- "ropey",
- "rust-lapper",
- "serde",
- "serde_json",
- "thiserror 2.0.9",
- "tokio",
- "tower-lsp",
 ]
 
 [[package]]

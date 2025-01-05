@@ -1,5 +1,5 @@
 {
-	"name": "nrs-language-server",
+	"name": "jjmagit-language-server",
 	"description": "nano rust language server",
 	"license": "MIT",
 	"version": "1.5.0",
@@ -16,23 +16,23 @@
 	},
 	"enabledApiProposals": [],
 	"activationEvents": [
-		"onLanguage:nrs"
+		"onLanguage:jjmagit"
 	],
 	"main": "./dist/extension.js",
 	"contributes": {
 		"languages": [
 			{
-				"id": "nrs",
+				"id": "jjmagit",
 				"extensions": [
-					".nrs"
+					".jjmagit"
 				]
 			}
 		],
 		"configuration": {
 			"type": "object",
-			"title": "nrs-language-server",
+			"title": "jjmagit-language-server",
 			"properties": {
-				"nrs-language-server.trace.server": {
+				"jjmagit-language-server.trace.server": {
 					"type": "string",
 					"scope": "window",
 					"enum": [

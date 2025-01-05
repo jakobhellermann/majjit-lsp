@@ -40,7 +40,7 @@ This repo is a template for `tower-lsp`, a useful github project template which 
 2. `cargo build`
 3. Open the project in VSCode: `code .`
 4. In VSCode, press <kbd>F5</kbd> or change to the Debug panel and click <kbd>Launch Client</kbd>.
-5. In the newly launched VSCode instance, open the file `examples/test.nrs` from this project.
+5. In the newly launched VSCode instance, open the file `examples/test.jjmagit` from this project.
 6. If the LSP is working correctly you should see syntax highlighting and the features described below should work.
 
 > [!note]
@@ -49,9 +49,9 @@ This repo is a template for `tower-lsp`, a useful github project template which 
 
 ### Preview and test extension locally with `VsCode`
 1. Make sure all dependency are installed.
-2. Make sure the `nrs-language-server` is under your `PATH`
+2. Make sure the `jjmagit-language-server` is under your `PATH`
 3. `pnpm run package`
-4. `code --install-extension nrs-language-server-${version}.vsix`, the `version` you could inspect in file system.
+4. `code --install-extension jjmagit-language-server-${version}.vsix`, the `version` you could inspect in file system.
 5. Restart the `VsCode`, and write a minimal `nano rust` file, then inspect the effect.
 
 For other editor, please refer the related manual, you could skip steps above.

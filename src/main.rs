@@ -1,8 +1,8 @@
 use dashmap::DashMap;
+use jjmagit_language_server::page_writer::{Page, PageWriter};
+use jjmagit_language_server::pages;
+use jjmagit_language_server::semantic_token::LEGEND_TYPE;
 use log::debug;
-use nrs_language_server::page_writer::{Page, PageWriter};
-use nrs_language_server::pages;
-use nrs_language_server::semantic_token::LEGEND_TYPE;
 use ropey::Rope;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -55,7 +55,7 @@ impl LanguageServer for Backend {
                             text_document_registration_options: {
                                 TextDocumentRegistrationOptions {
                                     document_selector: Some(vec![DocumentFilter {
-                                        language: Some("nrs".to_string()),
+                                        language: Some("jjmagit".to_string()),
                                         scheme: Some("file".to_string()),
                                         pattern: None,
                                     }]),
@@ -339,10 +339,10 @@ impl LanguageServer for Backend {
                     k.start,
                     k.end,
                     match v {
-                        nrs_language_server::nrs_lang::Value::Null => "null".to_string(),
-                        nrs_language_server::nrs_lang::Value::Bool(_) => "bool".to_string(),
-                        nrs_language_server::nrs_lang::Value::Num(_) => "number".to_string(),
-                        nrs_language_server::nrs_lang::Value::Str(_) => "string".to_string(),
+                        jjmagit_language_server::jjmagit_lang::Value::Null => "null".to_string(),
+                        jjmagit_language_server::jjmagit_lang::Value::Bool(_) => "bool".to_string(),
+                        jjmagit_language_server::jjmagit_lang::Value::Num(_) => "number".to_string(),
+                        jjmagit_language_server::jjmagit_lang::Value::Str(_) => "string".to_string(),
                     },
                 )
             })
@@ -390,7 +390,7 @@ impl LanguageServer for Backend {
             let mut ret = Vec::with_capacity(completions.len());
             for (_, item) in completions {
                 match item {
-                    nrs_language_server::completion::ImCompleteCompletionItem::Variable(var) => {
+                    jjmagit_language_server::completion::ImCompleteCompletionItem::Variable(var) => {
                         ret.push(CompletionItem {
                             label: var.clone(),
                             insert_text: Some(var.clone()),
@@ -399,7 +399,7 @@ impl LanguageServer for Backend {
                             ..Default::default()
                         });
                     }
-                    nrs_language_server::completion::ImCompleteCompletionItem::Function(
+                    jjmagit_language_server::completion::ImCompleteCompletionItem::Function(
                         name,
                         args,
                     ) => {
@@ -510,7 +510,7 @@ impl Backend {
         self.document_map.insert(params.uri.to_string(), rope);
 
         let repo = "/home/jakob/dev/jj/jj";
-        let page_file = "/home/jakob/dev/jj/jj/.jj/stage.nrs";
+        let page_file = "/home/jakob/dev/jj/jj/.jj/stage.jjmagit";
         let mut out = PageWriter::default();
         pages::stage::render(&mut out, repo).unwrap();
 

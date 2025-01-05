@@ -13,8 +13,8 @@ import {
 let client: LanguageClient;
 
 export async function activate(context: ExtensionContext) {
-  const traceOutputChannel = window.createOutputChannel("Nrs Language Server trace");
-  const command = process.env.SERVER_PATH || "nrs-language-server";
+  const traceOutputChannel = window.createOutputChannel("jjmagit Language Server trace");
+  const command = process.env.SERVER_PATH || "jjmagit-language-server";
 
   const run: Executable = {
     command,
@@ -30,11 +30,11 @@ export async function activate(context: ExtensionContext) {
     debug: run,
   };
   let clientOptions: LanguageClientOptions = {
-    documentSelector: [{ scheme: "file", language: "nrs" }],
+    documentSelector: [{ scheme: "file", language: "jjmagit" }],
     traceOutputChannel,
   };
 
-  client = new LanguageClient("nrs-language-server", "nrs language server", serverOptions, clientOptions);
+  client = new LanguageClient("jjmagit-language-server", "jjmagit language server", serverOptions, clientOptions);
   client.start();
 }
 
