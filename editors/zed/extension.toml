@@ -1,0 +1,16 @@
+id = "jjmagit"
+name = "jjmagit"
+version = "0.0.1"
+schema_version = 1
+authors = ["Jakob Hellermann <jakobhellermann@protonmail.com>"]
+description = "todo"
+repository = "todo"
+
+[language_servers.jjmagit]
+name = "jjmagit-language-server"
+languages = ["jjmagit"]
+
+
+[grammars.jjmagit]
+repository = "https://github.com/jakobhellermann/jjmagit-treesitter"
+rev = "66a1d03cfde45059df38778c73a6a08cdd260a4d"
