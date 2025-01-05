@@ -1,11 +1,11 @@
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use anyhow::anyhow;
 use dashmap::DashMap;
 use jjmagit_language_server::page_writer::{Page, PageWriter};
-use jjmagit_language_server::pages;
+use jjmagit_language_server::pages::{self};
 use jjmagit_language_server::semantic_token::LEGEND_TYPE;
-use log::{debug, info};
+use log::{debug, error, trace};
 use ropey::Rope;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -82,11 +82,8 @@ impl LanguageServer for Backend {
                         },
                     ),
                 ),
-                // definition: Some(GotoCapability::default()),
                 folding_range_provider: Some(FoldingRangeProviderCapability::Simple(true)),
                 definition_provider: Some(OneOf::Left(true)),
-                references_provider: Some(OneOf::Left(true)),
-                rename_provider: Some(OneOf::Left(true)),
                 ..ServerCapabilities::default()
             },
         })
@@ -101,34 +98,42 @@ impl LanguageServer for Backend {
 
     async fn did_open(&self, params: DidOpenTextDocumentParams) {
         debug!("file opened");
-        self.on_change(TextDocumentItem {
+        let item = TextDocumentItem {
             uri: params.text_document.uri,
             text: &params.text_document.text,
             version: Some(params.text_document.version),
-        })
-        .await;
+        };
+        if let Err(e) = self.on_change(item).await {
+            log::error!("Error during did_open: {}", e);
+        }
     }
 
     async fn did_change(&self, params: DidChangeTextDocumentParams) {
-        self.on_change(TextDocumentItem {
+        debug!("file changed");
+        let item = TextDocumentItem {
             text: &params.content_changes[0].text,
             uri: params.text_document.uri,
             version: Some(params.text_document.version),
-        })
-        .await
+        };
+        if let Err(e) = self.on_change(item).await {
+            log::error!("Error during did_change: {}", e);
+        }
     }
 
     async fn did_save(&self, params: DidSaveTextDocumentParams) {
+        debug!("file saved!");
         if let Some(text) = params.text {
             let item = TextDocumentItem {
                 uri: params.text_document.uri,
                 text: &text,
                 version: None,
             };
-            self.on_change(item).await;
+            if let Err(e) = self.on_change(item).await {
+                log::error!("Error during did_save: {}", e);
+            }
+
             _ = self.client.semantic_tokens_refresh().await;
         }
-        debug!("file saved!");
     }
     async fn did_close(&self, _: DidCloseTextDocumentParams) {
         debug!("file closed!");
@@ -145,8 +150,6 @@ impl LanguageServer for Backend {
             let rope = self.document_map.get(uri.as_str())?;
             let position = params.text_document_position_params.position;
             let offset = position_to_offset(position, &rope)?;
-
-            info!("count {:?}", page.goto_def);
 
             let goto_def = page
                 .goto_def
@@ -205,7 +208,7 @@ impl LanguageServer for Backend {
         params: SemanticTokensParams,
     ) -> Result<Option<SemanticTokensResult>> {
         let uri = params.text_document.uri.to_string();
-        debug!("semantic_token_full");
+        trace!("semantic_token_full");
         let semantic_tokens = || -> Option<Vec<SemanticToken>> {
             let page = &mut self.page_map.get_mut(&uri)?;
             let im_complete_tokens = &mut page.labels;
@@ -296,6 +299,7 @@ impl LanguageServer for Backend {
         params: tower_lsp::lsp_types::FoldingRangeParams,
     ) -> Result<Option<Vec<FoldingRange>>> {
         let uri = params.text_document.uri.to_string();
+        debug!("folding ranges");
 
         let folding_ranges = || -> Option<Vec<FoldingRange>> {
             let page = self.page_map.get(&uri)?;
@@ -550,20 +554,52 @@ struct TextDocumentItem<'a> {
     version: Option<i32>,
 }
 
-impl Backend {
-    async fn on_change(&self, params: TextDocumentItem<'_>) {
-        let rope = ropey::Rope::from_str(params.text);
+fn jjmagit_file_name(uri: &Url) -> Option<(PathBuf, PathBuf, String)> {
+    let path = uri.to_file_path().ok()?;
 
+    let dot_jj = path.parent()?;
+    if dot_jj.file_name()? != ".jj" {
+        return None;
+    }
+    let repo_path = dot_jj.parent()?;
+
+    let file_name = path.file_name()?.to_str()?;
+    let (name, extension) = file_name.split_once('.')?;
+    let name = name.to_owned();
+
+    if extension != "jjmagit" {
+        return None;
+    }
+
+    Some((repo_path.to_owned(), path, name))
+}
+
+impl Backend {
+    async fn on_change(&self, params: TextDocumentItem<'_>) -> anyhow::Result<()> {
+        let rope = ropey::Rope::from_str(params.text);
         self.document_map.insert(params.uri.to_string(), rope);
 
-        let repo = Path::new("/home/jakob/dev/jj/jj");
-        let page_file = "/home/jakob/dev/jj/jj/.jj/stage.jjmagit";
-        let mut out = PageWriter::default();
-        pages::stage::render(&mut out, repo).unwrap();
+        let Some((repo_path, page_path, page_name)) = jjmagit_file_name(&params.uri) else {
+            error!("Unexpected filename: {}", params.uri);
+            return Ok(());
+        };
 
+        let Some(page) = pages::named(&page_name) else {
+            error!("Unknown page: {}", page_name);
+            return Ok(());
+        };
+
+        let mut out = PageWriter::default();
+        page.render(&mut out, &repo_path)?;
         let page = out.finish();
-        std::fs::write(page_file, &page.text).unwrap();
+        std::fs::write(page_path, &page.text)?;
+
+        let changed = page.text != params.text;
+        debug!("on_change regenerated a different file: {}", changed);
+
         self.page_map.insert(params.uri.to_string(), page);
+
+        Ok(())
     }
 }
 

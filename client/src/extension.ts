@@ -40,7 +40,7 @@ export async function activate(context: ExtensionContext) {
   client.start();
 
   context.subscriptions.push(vscode.workspace.onDidOpenTextDocument(onDidOpenTextDocument));
-  context.subscriptions.push(vscode.workspace.onDidChangeTextDocument(x => onDidOpenTextDocument(x.document)));
+  context.subscriptions.push(vscode.workspace.onDidChangeTextDocument(e => onDidChangeTextDocument(e.document)));
   context.subscriptions.push(vscode.commands.registerCommand("jjmagit.open.split", commandSplit));
 }
 
@@ -50,6 +50,12 @@ export function deactivate(): Thenable<void> | undefined {
   return client.stop();
 }
 
+
+
+async function onDidChangeTextDocument(document: vscode.TextDocument) {
+  await foldAll();
+}
+
 async function onDidOpenTextDocument(document: vscode.TextDocument) {
   if (document.languageId === 'jjmagit' || document.fileName.endsWith(".jjmagit") || document.fileName.endsWith(".jjmagit.git")) {
     await vscode.commands.executeCommand("workbench.action.files.setActiveEditorReadonlyInSession");
@@ -57,9 +63,10 @@ async function onDidOpenTextDocument(document: vscode.TextDocument) {
 }
 
 async function commandSplit() {
-  let workspaceFolder = vscode.workspace.workspaceFolders[0].uri?.fsPath;
+  let workspaceFolder = vscode.workspace.workspaceFolders?.[0]?.uri?.fsPath;
   if (!workspaceFolder) {
     vscode.window.showErrorMessage("No workspace folder found");
+    return;
   }
 
   let args = {
@@ -71,5 +78,9 @@ async function commandSplit() {
   let document = await vscode.workspace.openTextDocument(vscode.Uri.file(response));
   let editor = await vscode.window.showTextDocument(document);
 
+  await foldAll();
+}
+
+async function foldAll() {
   await vscode.commands.executeCommand('editor.foldAll');
 }
