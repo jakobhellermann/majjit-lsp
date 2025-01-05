@@ -474,7 +474,7 @@ struct TextDocumentItem<'a> {
 }
 
 impl Backend {
-    async fn on_change<'a>(&self, params: TextDocumentItem<'a>) {
+    async fn on_change(&self, params: TextDocumentItem<'_>) {
         dbg!(&params.version);
         let rope = ropey::Rope::from_str(params.text);
         self.document_map
