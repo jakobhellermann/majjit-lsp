@@ -1,10 +1,11 @@
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use std::collections::BTreeMap;
 use std::io::Write;
 use std::path::Path;
+use tower_lsp::lsp_types::Url;
 
 use crate::jj;
-use crate::page_writer::PageWriter;
+use crate::page_writer::{GotoDefinitionTarget, PageWriter};
 
 pub fn render(out: &mut PageWriter, repo: &Path) -> Result<()> {
     let head = jj::log(
@@ -36,7 +37,14 @@ pub fn render(out: &mut PageWriter, repo: &Path) -> Result<()> {
     )?;
     for (sigil, files) in changes {
         for filename in files {
-            writeln!(out, "{}\t{}", sigil, filename)?;
+            write!(out, "{}\t", sigil)?;
+
+            let path = repo.join(filename);
+            let target = GotoDefinitionTarget {
+                target: Url::from_file_path(&path)
+                    .map_err(|_| anyhow!("couldn't turn path {} into url", path.display()))?,
+            };
+            writeln!(out.goto_def(target), "{}", filename)?;
         }
     }
 

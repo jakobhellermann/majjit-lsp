@@ -1,3 +1,5 @@
+use tower_lsp::lsp_types::Url;
+
 use crate::span::Span;
 use std::fmt::Write as _;
 
@@ -8,6 +10,12 @@ pub struct Page {
     pub text: String,
     pub labels: Vec<(Span, TokenType)>,
     pub folding_ranges: Vec<(Span, ())>,
+    pub goto_def: Vec<(Span, GotoDefinitionTarget)>,
+}
+
+#[derive(Debug)]
+pub struct GotoDefinitionTarget {
+    pub target: Url,
 }
 
 #[derive(Default)]
@@ -16,6 +24,7 @@ pub struct PageWriter {
 
     labels: WriterStack<usize>,
     folds: WriterStack<()>,
+    goto_def: WriterStack<GotoDefinitionTarget>,
 }
 
 struct WriterStack<T> {
@@ -29,20 +38,31 @@ impl PageWriter {
             text: self.buf,
             labels: self.labels.done,
             folding_ranges: self.folds.done,
+            goto_def: self.goto_def.done,
         }
     }
     pub fn labelled(&mut self, token_type: TokenType) -> ScopedWriter<'_, usize> {
         ScopedWriter {
             buf: &mut self.buf,
             stack: &mut self.labels,
-            data: token_type,
+            data: Some(token_type),
         }
     }
     pub fn folding(&mut self) -> ScopedWriter<'_, ()> {
         ScopedWriter {
             buf: &mut self.buf,
             stack: &mut self.folds,
-            data: (),
+            data: Some(()),
+        }
+    }
+    pub fn goto_def(
+        &mut self,
+        target: GotoDefinitionTarget,
+    ) -> ScopedWriter<'_, GotoDefinitionTarget> {
+        ScopedWriter {
+            buf: &mut self.buf,
+            stack: &mut self.goto_def,
+            data: Some(target),
         }
     }
 
@@ -91,12 +111,17 @@ impl<T> WriterStack<T> {
 pub struct ScopedWriter<'a, T> {
     stack: &'a mut WriterStack<T>,
     buf: &'a mut String,
-    data: T,
+    data: Option<T>,
 }
 
-impl<'a, T: Copy> ScopedWriter<'a, T> {
+impl<'a, T> ScopedWriter<'a, T> {
     pub fn write_fmt(&mut self, fmt: std::fmt::Arguments<'_>) -> std::io::Result<()> {
-        self.stack.push(&self.buf, self.data);
+        self.stack.push(
+            &self.buf,
+            self.data
+                .take()
+                .expect("multiple write_fmt on ScopedWriter"),
+        );
         let _ = self.buf.write_fmt(fmt);
         self.stack.pop(&self.buf);
         Ok(())

@@ -5,7 +5,7 @@ use dashmap::DashMap;
 use jjmagit_language_server::page_writer::{Page, PageWriter};
 use jjmagit_language_server::pages;
 use jjmagit_language_server::semantic_token::LEGEND_TYPE;
-use log::debug;
+use log::{debug, info};
 use ropey::Rope;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -136,42 +136,41 @@ impl LanguageServer for Backend {
 
     async fn goto_definition(
         &self,
-        _params: GotoDefinitionParams,
+        params: GotoDefinitionParams,
     ) -> Result<Option<GotoDefinitionResponse>> {
         debug!("goto defintion");
-        /*let definition = || -> Option<GotoDefinitionResponse> {
+        let definition = || -> Option<GotoDefinitionResponse> {
             let uri = params.text_document_position_params.text_document.uri;
-            let semantic = self.semantic_map.get(uri.as_str())?;
+            let page = self.page_map.get(uri.as_str())?;
             let rope = self.document_map.get(uri.as_str())?;
             let position = params.text_document_position_params.position;
             let offset = position_to_offset(position, &rope)?;
 
-            let interval = semantic.ident_range.find(offset, offset + 1).next()?;
-            let interval_val = interval.val;
-            let range = match interval_val {
-                IdentType::Binding(symbol_id) => {
-                    let span = &semantic.table.symbol_id_to_span[symbol_id];
-                    Some(span.clone())
-                }
-                IdentType::Reference(reference_id) => {
-                    let reference = semantic.table.reference_id_to_reference.get(reference_id)?;
-                    let symbol_id = reference.symbol_id?;
-                    let symbol_range = semantic.table.symbol_id_to_span.get(symbol_id)?;
-                    Some(symbol_range.clone())
-                }
-            };
+            info!("count {:?}", page.goto_def);
 
-            range.and_then(|range| {
+            let goto_def = page
+                .goto_def
+                .iter()
+                .filter(|(span, _)| span.contains(&offset))
+                .last();
+
+            goto_def.and_then(|(range, target)| {
                 let start_position = offset_to_position(range.start, &rope)?;
                 let end_position = offset_to_position(range.end, &rope)?;
-                Some(GotoDefinitionResponse::Scalar(Location::new(
-                    uri,
-                    Range::new(start_position, end_position),
-                )))
+
+                let target_range = Range::default();
+                Some(GotoDefinitionResponse::Link(vec![LocationLink {
+                    origin_selection_range: Some(Range {
+                        start: start_position,
+                        end: end_position,
+                    }),
+                    target_uri: target.target.clone(),
+                    target_range,
+                    target_selection_range: target_range,
+                }]))
             })
         }();
-        Ok(definition)*/
-        Ok(None)
+        Ok(definition)
     }
 
     async fn references(&self, _params: ReferenceParams) -> Result<Option<Vec<Location>>> {
@@ -586,7 +585,6 @@ async fn main() {
     Server::new(stdin, stdout, socket).serve(service).await;
 }
 
-#[expect(dead_code)]
 fn offset_to_position(offset: usize, rope: &Rope) -> Option<Position> {
     let line = rope.try_char_to_line(offset).ok()?;
     let first_char_of_line = rope.try_line_to_char(line).ok()?;
@@ -594,7 +592,6 @@ fn offset_to_position(offset: usize, rope: &Rope) -> Option<Position> {
     Some(Position::new(line as u32, column as u32))
 }
 
-#[expect(dead_code)]
 fn position_to_offset(position: Position, rope: &Rope) -> Option<usize> {
     let line_char_offset = rope.try_line_to_char(position.line as usize).ok()?;
     let slice = rope.slice(0..line_char_offset + position.character as usize);
