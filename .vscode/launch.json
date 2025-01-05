@@ -15,7 +15,7 @@
         "${workspaceRoot}/client/out/**/*.js"
       ],
       "env": {
-        "SERVER_PATH": "${workspaceRoot}/target/debug/nrs-language-server"
+        "SERVER_PATH": "/home/jakob/.cache/rust/debug/nrs-language-server"
       }
     },
     // {
