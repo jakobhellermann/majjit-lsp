@@ -53,7 +53,7 @@ export function deactivate(): Thenable<void> | undefined {
 
 
 async function onDidChangeTextDocument(document: vscode.TextDocument) {
-  await foldAll();
+  // await foldAll();
 }
 
 async function onDidOpenTextDocument(document: vscode.TextDocument) {

@@ -56,6 +56,18 @@
 				}
 			}
 		},
+		"keybindings": [
+			{
+				"key": "tab",
+				"command": "editor.toggleFold",
+				"when": "editorLangId == 'jjmagit'"
+			},
+			{
+				"key": "enter",
+				"command": "editor.action.revealDefinition",
+				"when": "editorLangId == 'jjmagit'"
+			}
+		],
 		"semanticTokenTypes": [
 			{
 				"id": "access-denied"
