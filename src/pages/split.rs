@@ -7,6 +7,7 @@ use tower_lsp::lsp_types::Url;
 use crate::jj::Repo;
 use crate::page_writer::GotoDefinitionTarget;
 use crate::page_writer::PageWriter;
+use crate::semantic_token;
 
 use super::Page;
 
@@ -55,14 +56,14 @@ impl Page for Split {
             let after_path = item.path.target();
 
             if let Some(op) = item.path.copy_operation() {
-                let sigil = match op {
-                    CopyOperation::Copy => "C",
-                    CopyOperation::Rename => "R",
+                let (label, sigil) = match op {
+                    CopyOperation::Copy => ("created", "C"),
+                    CopyOperation::Rename => ("renamed", "R"),
                 };
                 let path = repo
                     .path_converter()
                     .format_copied_path(before_path, after_path);
-                writeln!(out.labelled(3), "{sigil} {path}")?;
+                writeln!(out.labelled(semantic_token::get(label)), "{sigil} {path}")?;
             } else {
                 let path = repo.path_converter().format_file_path(after_path);
 
@@ -73,16 +74,25 @@ impl Page for Split {
                 };
                 out.goto_def.push(&out.buf, target);
                 match (before.is_present(), after.is_present()) {
-                    (true, true) => writeln!(out.labelled(4), "M {path}")?,
-                    (false, true) => writeln!(out.labelled(5), "A {path}")?,
-                    (true, false) => writeln!(out.labelled(6), "D {path}")?,
+                    (true, true) => {
+                        let label = semantic_token::get("modified");
+                        writeln!(out.labelled(label), "M {path}")?
+                    }
+                    (false, true) => {
+                        let label = semantic_token::get("added");
+                        writeln!(out.labelled(label), "A {path}")?
+                    }
+                    (true, false) => {
+                        let label = semantic_token::get("deleted");
+                        writeln!(out.labelled(label), "D {path}")?
+                    }
                     (false, false) => unreachable!(),
                 }
                 out.goto_def.pop(&out.buf);
             }
 
             let matcher = FilesMatcher::new([item.path.source(), item.path.target()]);
-            diff_state.write_diff(&mut out.plaintext(), &matcher)?;
+            diff_state.write_diff(&mut out.formatter(), &matcher)?;
             out.pop_fold();
         }
 
@@ -90,7 +100,6 @@ impl Page for Split {
         writeln!(out.labelled(0), "Recent commits")?;
 
         let log = repo.log()?;
-        dbg!(log.len());
         for commit in log {
             out.push_fold();
             repo.write_template(&mut out.formatter(), &commit)?;

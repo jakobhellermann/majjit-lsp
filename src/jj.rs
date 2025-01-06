@@ -3,7 +3,7 @@ use futures_executor::block_on_stream;
 use jj_cli::commit_templater::{CommitTemplateLanguage, CommitTemplateLanguageExtension};
 use jj_cli::config::{config_from_environment, default_config_layers, ConfigEnv};
 use jj_cli::diff_util::{self, show_diff_summary, UnifiedDiffOptions};
-use jj_cli::formatter::{Formatter, PlainTextFormatter};
+use jj_cli::formatter::Formatter;
 use jj_cli::revset_util::{self, RevsetExpressionEvaluator};
 use jj_cli::template_builder::{self, TemplateLanguage};
 use jj_cli::template_parser::{TemplateAliasesMap, TemplateDiagnostics};
@@ -133,7 +133,6 @@ impl Repo {
 
     pub fn log(&self) -> Result<Vec<Commit>> {
         let revset_string = self.settings.get_string("revsets.log")?;
-        dbg!(&revset_string);
         let revset = self.revset_expression(&revset_string)?.evaluate()?;
 
         let commits = revset
@@ -231,7 +230,7 @@ impl DiffState<'_> {
                 .diff_stream_with_copies(&self.to_tree, matcher, &self.copy_records);
 
         jj_cli::diff_util::show_git_diff(
-            &mut PlainTextFormatter::new(f),
+            f,
             self.repo.repo.store(),
             diff,
             &UnifiedDiffOptions {

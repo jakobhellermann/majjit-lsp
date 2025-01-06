@@ -1,11 +1,11 @@
 use jj_cli::formatter::{Formatter, PlainTextFormatter};
 use tower_lsp::lsp_types::Url;
 
-use crate::semantic_token::LEGEND_TYPE;
+use crate::semantic_token;
 use crate::span::Span;
 use std::fmt::Write as _;
 
-type TokenType = usize;
+type TokenType = u32;
 
 #[derive(Debug)]
 pub struct Page {
@@ -44,7 +44,7 @@ impl PageWriter {
             goto_def: self.goto_def.done,
         }
     }
-    pub fn labelled(&mut self, token_type: TokenType) -> ScopedWriter<'_, usize> {
+    pub fn labelled(&mut self, token_type: TokenType) -> ScopedWriter<'_, TokenType> {
         ScopedWriter {
             buf: &mut self.buf,
             stack: &mut self.labels,
@@ -80,7 +80,7 @@ impl PageWriter {
         PlainTextFormatter::new(&mut *self)
     }
 
-    pub fn formatter(&mut self) -> impl Formatter + '_ {
+    pub fn formatter(&mut self) -> FormatterAdapter<'_> {
         FormatterAdapter {
             writer: self,
             debug: false,
@@ -91,6 +91,14 @@ impl PageWriter {
 pub struct FormatterAdapter<'a> {
     writer: &'a mut PageWriter,
     debug: bool,
+}
+impl<'a> FormatterAdapter<'a> {
+    pub fn debug(self) -> Self {
+        FormatterAdapter {
+            writer: self.writer,
+            debug: true,
+        }
+    }
 }
 impl<'a> std::io::Write for FormatterAdapter<'a> {
     fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
@@ -112,15 +120,22 @@ impl<'a> Formatter for FormatterAdapter<'a> {
             self.writer.buf.push_str("(");
         }
 
-        let idx = (label.chars().next().unwrap() as u8) as usize % LEGEND_TYPE.len();
+        let token = semantic_token::get_or_default(label);
 
-        self.writer.labels.push(&self.writer.buf, idx);
+        self.writer.labels.push(&self.writer.buf, token);
         Ok(())
     }
 
     fn pop_label(&mut self) -> std::io::Result<()> {
         if self.debug {
+            let has_newline = self.writer.buf.strip_suffix("\n").is_some();
+            if has_newline {
+                self.writer.buf.truncate(self.writer.buf.len() - 1);
+            }
             self.writer.buf.push_str(")");
+            if has_newline {
+                self.writer.buf.push_str("\n");
+            }
         }
         self.writer.labels.pop(&self.writer.buf);
         Ok(())

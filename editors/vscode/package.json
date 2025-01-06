@@ -55,7 +55,360 @@
 					"description": "Traces the communication between VS Code and the language server."
 				}
 			}
-		}
+		},
+		"semanticTokenTypes": [
+			{
+				"id": "access-denied"
+			},
+			{
+				"id": "added"
+			},
+			{
+				"id": "author"
+			},
+			{
+				"id": "binary"
+			},
+			{
+				"id": "bookmark"
+			},
+			{
+				"id": "bookmarks"
+			},
+			{
+				"id": "branch"
+			},
+			{
+				"id": "branches"
+			},
+			{
+				"id": "change_id"
+			},
+			{
+				"id": "commit_id"
+			},
+			{
+				"id": "committer"
+			},
+			{
+				"id": "conflict"
+			},
+			{
+				"id": "conflict_description"
+			},
+			{
+				"id": "copied"
+			},
+			{
+				"id": "current_operation"
+			},
+			{
+				"id": "difficult"
+			},
+			{
+				"id": "divergent"
+			},
+			{
+				"id": "elided"
+			},
+			{
+				"id": "empty"
+			},
+			{
+				"id": "error"
+			},
+			{
+				"id": "error_source"
+			},
+			{
+				"id": "file_header"
+			},
+			{
+				"id": "git_head"
+			},
+			{
+				"id": "git_refs"
+			},
+			{
+				"id": "header"
+			},
+			{
+				"id": "heading"
+			},
+			{
+				"id": "hint"
+			},
+			{
+				"id": "hunk_header"
+			},
+			{
+				"id": "id"
+			},
+			{
+				"id": "immutable"
+			},
+			{
+				"id": "local_bookmarks"
+			},
+			{
+				"id": "local_branches"
+			},
+			{
+				"id": "modified"
+			},
+			{
+				"id": "name"
+			},
+			{
+				"id": "overridden"
+			},
+			{
+				"id": "placeholder"
+			},
+			{
+				"id": "prefix"
+			},
+			{
+				"id": "remote_bookmarks"
+			},
+			{
+				"id": "remote_branches"
+			},
+			{
+				"id": "removed"
+			},
+			{
+				"id": "renamed"
+			},
+			{
+				"id": "rest"
+			},
+			{
+				"id": "root"
+			},
+			{
+				"id": "separator"
+			},
+			{
+				"id": "tag"
+			},
+			{
+				"id": "tags"
+			},
+			{
+				"id": "time"
+			},
+			{
+				"id": "timestamp"
+			},
+			{
+				"id": "token"
+			},
+			{
+				"id": "user"
+			},
+			{
+				"id": "value"
+			},
+			{
+				"id": "warning"
+			},
+			{
+				"id": "working_copies"
+			},
+			{
+				"id": "working_copy"
+			}
+		],
+		"semanticTokenScopes": [
+			{
+				"scopes": {
+					"access-denied": [
+						"entity.name.type.template"
+					],
+					"added": [
+						"markup.inserted"
+					],
+					"author": [
+						"entity.name.type.template"
+					],
+					"binary": [
+						"entity.name.type.template"
+					],
+					"bookmark": [
+						"entity.name.type.template"
+					],
+					"bookmarks": [
+						"entity.name.type.template"
+					],
+					"branch": [
+						"entity.name.type.template"
+					],
+					"branches": [
+						"entity.name.type.template"
+					],
+					"change_id": [
+						"entity.name.type.template"
+					],
+					"commit_id": [
+						"entity.name.type.template"
+					],
+					"committer": [
+						"entity.name.type.template"
+					],
+					"conflict": [
+						"entity.name.type.template"
+					],
+					"conflict_description": [
+						"entity.name.type.template"
+					],
+					"copied": [
+						"entity.name.type.template"
+					],
+					"current_operation": [
+						"entity.name.type.template"
+					],
+					"difficult": [
+						"entity.name.type.template"
+					],
+					"divergent": [
+						"entity.name.type.template"
+					],
+					"elided": [
+						"entity.name.type.template"
+					],
+					"empty": [
+						"entity.name.type.template"
+					],
+					"error": [
+						"entity.name.type.template"
+					],
+					"error_source": [
+						"entity.name.type.template"
+					],
+					"file_header": [
+						"meta.diff.header"
+					],
+					"git_head": [
+						"entity.name.type.template"
+					],
+					"git_refs": [
+						"entity.name.type.template"
+					],
+					"header": [
+						"meta.diff.header"
+					],
+					"heading": [
+						"meta.diff.header"
+					],
+					"hint": [
+						"entity.name.type.template"
+					],
+					"hunk_header": [
+						"meta.diff.header"
+					],
+					"id": [
+						"entity.name.type.template"
+					],
+					"immutable": [
+						"entity.name.type.template"
+					],
+					"local_bookmarks": [
+						"entity.name.type.template"
+					],
+					"local_branches": [
+						"entity.name.type.template"
+					],
+					"modified": [
+						"markup.changed"
+					],
+					"name": [
+						"entity.name.type.template"
+					],
+					"overridden": [
+						"entity.name.type.template"
+					],
+					"placeholder": [
+						"entity.name.type.template"
+					],
+					"prefix": [
+						"entity.name.type.template"
+					],
+					"remote_bookmarks": [
+						"entity.name.type.template"
+					],
+					"remote_branches": [
+						"entity.name.type.template"
+					],
+					"removed": [
+						"markup.deleted"
+					],
+					"renamed": [
+						"entity.name.type.template"
+					],
+					"rest": [
+						"entity.name.type.template"
+					],
+					"root": [
+						"entity.name.type.template"
+					],
+					"separator": [
+						"entity.name.type.template"
+					],
+					"tag": [
+						"entity.name.type.template"
+					],
+					"tags": [
+						"entity.name.type.template"
+					],
+					"time": [
+						"entity.name.type.template"
+					],
+					"timestamp": [
+						"entity.name.type.template"
+					],
+					"token": [
+						"entity.name.type.template"
+					],
+					"user": [
+						"entity.name.type.template"
+					],
+					"value": [
+						"entity.name.type.template"
+					],
+					"warning": [
+						"entity.name.type.template"
+					],
+					"working_copies": [
+						"entity.name.type.template"
+					],
+					"working_copy": [
+						"entity.name.type.template"
+					],
+					"ago": [
+						"entity.name.type.template"
+					],
+					"context": [
+						""
+					],
+					"description": [
+						"entity.name.type.template"
+					],
+					"diff": [
+						"source.diff"
+					],
+					"first_line": [
+						"entity.name.type.template"
+					],
+					"shortest": [
+						"function"
+					],
+					"summary": [
+						"entity.name.type.template"
+					]
+				}
+			}
+		]
 	},
 	"scripts": {
 		"build": "esbuild src/extension.ts --bundle --outfile=out/main.js --external:vscode --format=cjs --platform=node --target=node14 --sourcemap",
