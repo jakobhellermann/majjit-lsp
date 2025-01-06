@@ -1,25 +1,26 @@
 use crate::{
-    jj,
+    jj::Repo,
     page_writer::PageWriter,
     pages::{self, Page},
 };
-use anyhow::{ensure, Result};
+use anyhow::{anyhow, Result};
 use std::path::{Path, PathBuf};
 use tokio::{fs::File, io::AsyncWriteExt};
 
 pub async fn open_split(workspace: &Path) -> Result<PathBuf> {
-    let workspace = jj::workspace_root(workspace)?;
+    let (page_path, page) = {
+        let repo = Repo::detect(workspace)?.ok_or_else(|| anyhow!("no jj root found"))?;
+        let page_path = repo.workspace_dir().join(".jj/split.jjmagit");
 
-    let dot_jj = workspace.join(".jj");
-    ensure!(dot_jj.is_dir());
+        let mut out = PageWriter::default();
+        pages::Split.render(&mut out, &repo)?;
 
-    let page_path = dot_jj.join("split.jjmagit");
-
-    let mut out = PageWriter::default();
-    pages::Split.render(&mut out, &workspace)?;
+        let page = out.finish().text;
+        (page_path, page)
+    };
 
     let mut file = File::create(&page_path).await?;
-    file.write_all(out.finish().text.as_bytes()).await?;
+    file.write_all(page.as_bytes()).await?;
 
     Ok(page_path)
 }

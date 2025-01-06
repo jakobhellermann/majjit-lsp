@@ -58,7 +58,7 @@ async function onDidChangeTextDocument(document: vscode.TextDocument) {
 
 async function onDidOpenTextDocument(document: vscode.TextDocument) {
   if (document.languageId === 'jjmagit' || document.fileName.endsWith(".jjmagit") || document.fileName.endsWith(".jjmagit.git")) {
-    await vscode.commands.executeCommand("workbench.action.files.setActiveEditorReadonlyInSession");
+    // await vscode.commands.executeCommand("workbench.action.files.setActiveEditorReadonlyInSession");
   }
 }
 

@@ -1,6 +1,5 @@
-use crate::page_writer::PageWriter;
+use crate::{jj::Repo, page_writer::PageWriter};
 use anyhow::Result;
-use std::path::Path;
 
 mod split;
 
@@ -17,5 +16,5 @@ pub fn named(name: &str) -> Option<&dyn Page> {
 pub trait Page {
     fn name(&self) -> &'static str;
 
-    fn render(&self, out: &mut PageWriter, repo: &Path) -> Result<()>;
+    fn render(&self, out: &mut PageWriter, repo: &Repo) -> Result<()>;
 }

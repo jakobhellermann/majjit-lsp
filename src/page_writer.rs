@@ -1,6 +1,7 @@
+use jj_cli::formatter::{Formatter, PlainTextFormatter};
 use tower_lsp::lsp_types::Url;
 
-use crate::span::Span;
+use crate::{semantic_token::LEGEND_TYPE, span::Span};
 use std::fmt::Write as _;
 
 type TokenType = usize;
@@ -20,20 +21,21 @@ pub struct GotoDefinitionTarget {
 
 #[derive(Default)]
 pub struct PageWriter {
-    buf: String,
+    pub buf: String,
 
-    labels: WriterStack<usize>,
-    folds: WriterStack<()>,
-    goto_def: WriterStack<GotoDefinitionTarget>,
+    pub labels: WriterStack<TokenType>,
+    pub folds: WriterStack<()>,
+    pub goto_def: WriterStack<GotoDefinitionTarget>,
 }
 
-struct WriterStack<T> {
+pub struct WriterStack<T> {
     in_progress: Vec<(usize, T)>,
     done: Vec<(Span, T)>,
 }
 
 impl PageWriter {
-    pub fn finish(self) -> Page {
+    pub fn finish(mut self) -> Page {
+        self.labels.done.sort_by_key(|(range, _)| range.start);
         Page {
             text: self.buf,
             labels: self.labels.done,
@@ -71,6 +73,56 @@ impl PageWriter {
     }
     pub fn pop_fold(&mut self) {
         self.folds.pop(&self.buf);
+    }
+
+    pub fn plaintext(&mut self) -> impl Formatter + '_ {
+        PlainTextFormatter::new(&mut *self)
+    }
+
+    pub fn formatter(&mut self) -> impl Formatter + '_ {
+        FormatterAdapter {
+            writer: self,
+            debug: false,
+        }
+    }
+}
+
+pub struct FormatterAdapter<'a> {
+    writer: &'a mut PageWriter,
+    debug: bool,
+}
+impl<'a> std::io::Write for FormatterAdapter<'a> {
+    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+        self.writer.write(buf)
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        self.writer.flush()
+    }
+}
+impl<'a> Formatter for FormatterAdapter<'a> {
+    fn raw(&mut self) -> std::io::Result<Box<dyn std::io::Write + '_>> {
+        Ok(Box::new(&mut self.writer))
+    }
+
+    fn push_label(&mut self, label: &str) -> std::io::Result<()> {
+        if self.debug {
+            self.writer.buf.push_str(label);
+            self.writer.buf.push_str("(");
+        }
+
+        let idx = (label.chars().next().unwrap() as u8) as usize % LEGEND_TYPE.len();
+
+        self.writer.labels.push(&self.writer.buf, idx);
+        Ok(())
+    }
+
+    fn pop_label(&mut self) -> std::io::Result<()> {
+        if self.debug {
+            self.writer.buf.push_str(")");
+        }
+        self.writer.labels.pop(&self.writer.buf);
+        Ok(())
     }
 }
 

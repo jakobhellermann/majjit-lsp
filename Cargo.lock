@@ -1944,8 +1944,10 @@ name = "jjmagit-language-server"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "chrono",
  "dashmap 6.1.0",
  "env_logger",
+ "futures-executor",
  "im-rc",
  "jj-cli",
  "jj-lib",

@@ -3,6 +3,7 @@ use std::path::{Path, PathBuf};
 
 use anyhow::anyhow;
 use dashmap::DashMap;
+use jjmagit_language_server::jj::Repo;
 use jjmagit_language_server::page_writer::{Page, PageWriter};
 use jjmagit_language_server::pages::{self};
 use jjmagit_language_server::semantic_token::LEGEND_TYPE;
@@ -590,8 +591,10 @@ impl Backend {
             return Ok(());
         };
 
+        let repo = Repo::detect(&repo_path)?.ok_or_else(|| anyhow!("no jj root found"))?;
+
         let mut out = PageWriter::default();
-        page.render(&mut out, &repo_path)?;
+        page.render(&mut out, &repo)?;
         let page = out.finish();
         std::fs::write(page_path, &page.text)?;
 
