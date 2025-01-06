@@ -12,6 +12,8 @@ import {
   ServerOptions,
 } from "vscode-languageclient/node";
 
+type PageName = "status";
+
 let client: LanguageClient;
 
 export async function activate(context: ExtensionContext) {
@@ -41,7 +43,10 @@ export async function activate(context: ExtensionContext) {
 
   context.subscriptions.push(vscode.workspace.onDidOpenTextDocument(onDidOpenTextDocument));
   context.subscriptions.push(vscode.workspace.onDidChangeTextDocument(e => onDidChangeTextDocument(e.document)));
-  context.subscriptions.push(vscode.commands.registerCommand("jjmagit.open.split", commandSplit));
+
+  for (const page of ["status"] satisfies PageName[]) {
+    context.subscriptions.push(vscode.commands.registerCommand(`jjmagit.open.${page}`, () => openPage(page)));
+  }
 }
 
 export function deactivate(): Thenable<void> | undefined {
@@ -62,7 +67,8 @@ async function onDidOpenTextDocument(document: vscode.TextDocument) {
   }
 }
 
-async function commandSplit() {
+
+async function openPage(page: PageName) {
   let workspaceFolder = vscode.workspace.workspaceFolders?.[0]?.uri?.fsPath;
   if (!workspaceFolder) {
     vscode.window.showErrorMessage("No workspace folder found");
@@ -70,8 +76,8 @@ async function commandSplit() {
   }
 
   let args = {
-    command: "open.split",
-    arguments: [workspaceFolder]
+    command: "open",
+    arguments: [workspaceFolder, page]
   } satisfies ExecuteCommandParams;
   let response = await client.sendRequest("workspace/executeCommand", args) as string;
 

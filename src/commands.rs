@@ -6,13 +6,15 @@ use std::path::{Path, PathBuf};
 use tokio::fs::File;
 use tokio::io::AsyncWriteExt;
 
-pub async fn open_split(workspace: &Path) -> Result<PathBuf> {
+pub async fn open_page(workspace: &Path, page: &dyn Page) -> Result<PathBuf> {
     let (page_path, page) = {
         let repo = Repo::detect(workspace)?.ok_or_else(|| anyhow!("no jj root found"))?;
-        let page_path = repo.workspace_dir().join(".jj/split.jjmagit");
+        let page_path = repo
+            .workspace_dir()
+            .join(format!(".jj/{}.jjmagit", page.name()));
 
         let mut out = PageWriter::default();
-        pages::Split.render(&mut out, &repo)?;
+        pages::Status.render(&mut out, &repo)?;
 
         let page = out.finish().text;
         (page_path, page)

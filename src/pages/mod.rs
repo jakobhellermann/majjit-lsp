@@ -2,11 +2,11 @@ use crate::jj::Repo;
 use crate::page_writer::PageWriter;
 use anyhow::Result;
 
-mod split;
+mod status;
 
-pub use split::Split;
+pub use status::Status;
 
-pub const ALL: &[&dyn Page] = &[&Split];
+pub const ALL: &[&dyn Page] = &[&Status];
 
 pub fn named(name: &str) -> Option<&dyn Page> {
     ALL.iter()
@@ -14,7 +14,7 @@ pub fn named(name: &str) -> Option<&dyn Page> {
         .map(|page| &**page)
 }
 
-pub trait Page {
+pub trait Page: Send + Sync {
     fn name(&self) -> &'static str;
 
     fn render(&self, out: &mut PageWriter, repo: &Repo) -> Result<()>;

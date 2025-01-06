@@ -30,8 +30,8 @@
 		],
 		"commands": [
 			{
-				"command": "jjmagit.open.split",
-				"title": "jjmagit: Open split page"
+				"command": "jjmagit.open.status",
+				"title": "jjmagit: Status"
 			}
 		],
 		"configuration": {
@@ -181,6 +181,9 @@
 				"id": "prefix"
 			},
 			{
+				"id": "remote"
+			},
+			{
 				"id": "remote_bookmarks"
 			},
 			{
@@ -241,9 +244,7 @@
 					"added": [
 						"markup.inserted"
 					],
-					"author": [
-						"entity.name.type.template"
-					],
+					"author": [],
 					"binary": [
 						"entity.name.type.template"
 					],
@@ -251,7 +252,7 @@
 						"entity.name.type.template"
 					],
 					"bookmarks": [
-						"entity.name.type.template"
+						"entity.name.function.preprocessor"
 					],
 					"branch": [
 						"entity.name.type.template"
@@ -265,9 +266,7 @@
 					"commit_id": [
 						"entity.name.type.template"
 					],
-					"committer": [
-						"entity.name.type.template"
-					],
+					"committer": [],
 					"conflict": [
 						"entity.name.type.template"
 					],
@@ -335,7 +334,7 @@
 						"markup.changed"
 					],
 					"name": [
-						"entity.name.type.template"
+						"entity.name.function.preprocessor"
 					],
 					"overridden": [
 						"entity.name.type.template"
@@ -344,7 +343,7 @@
 						"entity.name.type.template"
 					],
 					"prefix": [
-						"entity.name.type.template"
+						"storage.type.struct"
 					],
 					"remote_bookmarks": [
 						"entity.name.type.template"
@@ -352,15 +351,16 @@
 					"remote_branches": [
 						"entity.name.type.template"
 					],
+					"remote": [
+						"entity.name.function.preprocessor"
+					],
 					"removed": [
 						"markup.deleted"
 					],
 					"renamed": [
 						"entity.name.type.template"
 					],
-					"rest": [
-						"entity.name.type.template"
-					],
+					"rest": [],
 					"root": [
 						"entity.name.type.template"
 					],
@@ -376,9 +376,7 @@
 					"time": [
 						"entity.name.type.template"
 					],
-					"timestamp": [
-						"entity.name.type.template"
-					],
+					"timestamp": [],
 					"token": [
 						"entity.name.type.template"
 					],
@@ -397,21 +395,17 @@
 					"working_copy": [
 						"entity.name.type.template"
 					],
-					"ago": [
-						"entity.name.type.template"
-					],
+					"ago": [],
 					"context": [
 						""
 					],
 					"description": [
-						"entity.name.type.template"
+						"support.constant"
 					],
 					"diff": [
 						"source.diff"
 					],
-					"first_line": [
-						"entity.name.type.template"
-					],
+					"first_line": [],
 					"shortest": [
 						"function"
 					],
@@ -430,6 +424,7 @@
 		"package": "vsce package"
 	},
 	"dependencies": {
+		"@types/vscode": "^1.96.0",
 		"vscode-languageclient": "9.0.1"
 	},
 	"devDependencies": {

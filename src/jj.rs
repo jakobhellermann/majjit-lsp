@@ -9,7 +9,7 @@ use jj_cli::template_builder::{self, TemplateLanguage};
 use jj_cli::template_parser::{TemplateAliasesMap, TemplateDiagnostics};
 use jj_cli::templater::{PropertyPlaceholder, TemplateRenderer};
 use jj_lib::commit::Commit;
-use jj_lib::config::{ConfigGetError, ConfigNamePathBuf, StackedConfig};
+use jj_lib::config::{ConfigGetError, ConfigGetResultExt, ConfigNamePathBuf, StackedConfig};
 use jj_lib::conflicts::{materialized_diff_stream, ConflictMarkerStyle, MaterializedTreeDiffEntry};
 use jj_lib::copies::CopyRecords;
 use jj_lib::id_prefix::IdPrefixContext;
@@ -95,6 +95,7 @@ impl Repo {
         let revset_extensions = Arc::new(RevsetExtensions::new());
         // TODO(config): user disambiguator
         let id_prefix_context = IdPrefixContext::new(Arc::clone(&revset_extensions));
+        id_prefix_context.populate(repo.base_repo())?;
 
         let template_aliases_map = load_template_aliases(settings.config())?;
 
@@ -115,10 +116,15 @@ impl Repo {
             &this.revset_parse_context(),
         )?;
 
+        this.id_prefix_context = match this.load_short_prefixes_expression()? {
+            Some(x) => this.id_prefix_context.disambiguate_within(x),
+            None => this.id_prefix_context,
+        };
+
         Ok(Some(this))
     }
 
-    pub fn write_template(&self, f: &mut dyn Formatter, commit: &Commit) -> Result<()> {
+    pub fn write_log(&self, f: &mut dyn Formatter, commit: &Commit) -> Result<()> {
         let language = self.commit_template_language();
         let template_string = self.settings.get_string("templates.log")?;
         let template = self.parse_template(
@@ -307,6 +313,27 @@ impl Repo {
             &self.revset_extensions,
             Some(workspace_context),
         )
+    }
+
+    fn load_short_prefixes_expression(&self) -> Result<Option<Rc<UserRevsetExpression>>> {
+        let revset_string = self
+            .settings
+            .get_string("revsets.short-prefixes")
+            .optional()?
+            .map_or_else(|| self.settings.get_string("revsets.log"), Ok)?;
+        if revset_string.is_empty() {
+            Ok(None)
+        } else {
+            let mut diagnostics = RevsetDiagnostics::new();
+            let (expression, modifier) = revset::parse_with_modifier(
+                &mut diagnostics,
+                &revset_string,
+                &self.revset_parse_context(),
+            )
+            .map_err(|err| anyhow::anyhow!("Invalid `revsets.short-prefixes`: {}", err))?;
+            let (None | Some(RevsetModifier::All)) = modifier;
+            Ok(Some(expression))
+        }
     }
 }
 
