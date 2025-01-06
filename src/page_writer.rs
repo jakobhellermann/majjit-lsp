@@ -1,7 +1,8 @@
 use jj_cli::formatter::{Formatter, PlainTextFormatter};
 use tower_lsp::lsp_types::Url;
 
-use crate::{semantic_token::LEGEND_TYPE, span::Span};
+use crate::semantic_token::LEGEND_TYPE;
+use crate::span::Span;
 use std::fmt::Write as _;
 
 type TokenType = usize;

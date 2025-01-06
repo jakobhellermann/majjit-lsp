@@ -1,34 +1,32 @@
 use chrono::TimeZone as _;
 use futures_executor::block_on_stream;
-use jj_cli::{
-    commit_templater::{CommitTemplateLanguage, CommitTemplateLanguageExtension},
-    config::{config_from_environment, default_config_layers, ConfigEnv},
-    diff_util::{self, show_diff_summary, UnifiedDiffOptions},
-    formatter::{Formatter, PlainTextFormatter},
-    revset_util::{self, RevsetExpressionEvaluator},
-    template_builder::{self, TemplateLanguage},
-    template_parser::{TemplateAliasesMap, TemplateDiagnostics},
-    templater::{PropertyPlaceholder, TemplateRenderer},
+use jj_cli::commit_templater::{CommitTemplateLanguage, CommitTemplateLanguageExtension};
+use jj_cli::config::{config_from_environment, default_config_layers, ConfigEnv};
+use jj_cli::diff_util::{self, show_diff_summary, UnifiedDiffOptions};
+use jj_cli::formatter::{Formatter, PlainTextFormatter};
+use jj_cli::revset_util::{self, RevsetExpressionEvaluator};
+use jj_cli::template_builder::{self, TemplateLanguage};
+use jj_cli::template_parser::{TemplateAliasesMap, TemplateDiagnostics};
+use jj_cli::templater::{PropertyPlaceholder, TemplateRenderer};
+use jj_lib::commit::Commit;
+use jj_lib::config::{ConfigGetError, ConfigNamePathBuf, StackedConfig};
+use jj_lib::conflicts::{materialized_diff_stream, ConflictMarkerStyle, MaterializedTreeDiffEntry};
+use jj_lib::copies::CopyRecords;
+use jj_lib::id_prefix::IdPrefixContext;
+use jj_lib::matchers::{EverythingMatcher, Matcher};
+use jj_lib::merged_tree::MergedTree;
+use jj_lib::repo::{ReadonlyRepo, Repo as _, StoreFactories};
+use jj_lib::repo_path::RepoPathUiConverter;
+use jj_lib::revset::{
+    self, RevsetAliasesMap, RevsetDiagnostics, RevsetExpression, RevsetExtensions,
+    RevsetIteratorExt, RevsetModifier, RevsetParseContext, RevsetWorkspaceContext,
+    UserRevsetExpression,
 };
-use jj_lib::{
-    commit::Commit,
-    config::{ConfigGetError, ConfigNamePathBuf, StackedConfig},
-    conflicts::{materialized_diff_stream, ConflictMarkerStyle, MaterializedTreeDiffEntry},
-    copies::CopyRecords,
-    id_prefix::IdPrefixContext,
-    matchers::{EverythingMatcher, Matcher},
-    merged_tree::MergedTree,
-    repo::{ReadonlyRepo, Repo as _, StoreFactories},
-    repo_path::RepoPathUiConverter,
-    revset::{
-        self, RevsetAliasesMap, RevsetDiagnostics, RevsetExpression, RevsetExtensions,
-        RevsetIteratorExt, RevsetModifier, RevsetParseContext, RevsetWorkspaceContext,
-        UserRevsetExpression,
-    },
-    settings::UserSettings,
-    workspace::Workspace,
-};
-use std::{path::Path, rc::Rc, sync::Arc};
+use jj_lib::settings::UserSettings;
+use jj_lib::workspace::Workspace;
+use std::path::Path;
+use std::rc::Rc;
+use std::sync::Arc;
 
 use anyhow::{anyhow, ensure, Result};
 

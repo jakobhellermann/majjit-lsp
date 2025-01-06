@@ -1,11 +1,10 @@
-use crate::{
-    jj::Repo,
-    page_writer::PageWriter,
-    pages::{self, Page},
-};
+use crate::jj::Repo;
+use crate::page_writer::PageWriter;
+use crate::pages::{self, Page};
 use anyhow::{anyhow, Result};
 use std::path::{Path, PathBuf};
-use tokio::{fs::File, io::AsyncWriteExt};
+use tokio::fs::File;
+use tokio::io::AsyncWriteExt;
 
 pub async fn open_split(workspace: &Path) -> Result<PathBuf> {
     let (page_path, page) = {
