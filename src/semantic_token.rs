@@ -12,8 +12,6 @@ macro_rules! semantic_tokens {
                     SemanticTokenType::new($name),
                 )*
             ];
-
-
     };
 }
 

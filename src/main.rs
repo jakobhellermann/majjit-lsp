@@ -26,7 +26,10 @@ struct Backend {
     workspace_folders: RwLock<Vec<Url>>,
 }
 
-const COMMAND_OPEN_SPLIT: &str = "open.split";
+mod commands {
+
+    pub const OPEN: &str = "open";
+}
 
 #[tower_lsp::async_trait]
 impl LanguageServer for Backend {
@@ -46,9 +49,10 @@ impl LanguageServer for Backend {
                         ..Default::default()
                     },
                 )),
+                code_action_provider: Some(CodeActionProviderCapability::Simple(true)),
                 completion_provider: None,
                 execute_command_provider: Some(ExecuteCommandOptions {
-                    commands: vec![COMMAND_OPEN_SPLIT.to_string()],
+                    commands: vec![commands::OPEN.to_string()],
                     work_done_progress_options: Default::default(),
                 }),
 
@@ -99,7 +103,8 @@ impl LanguageServer for Backend {
     }
 
     async fn did_open(&self, params: DidOpenTextDocumentParams) {
-        debug!("file opened");
+        debug!("file opened: {}", params.text_document.uri);
+
         let item = TextDocumentItem {
             uri: params.text_document.uri,
             text: &params.text_document.text,
@@ -111,7 +116,8 @@ impl LanguageServer for Backend {
     }
 
     async fn did_change(&self, params: DidChangeTextDocumentParams) {
-        debug!("file changed");
+        debug!("file changed: {}", params.text_document.uri);
+
         let item = TextDocumentItem {
             text: &params.content_changes[0].text,
             uri: params.text_document.uri,
@@ -301,7 +307,7 @@ impl LanguageServer for Backend {
         params: tower_lsp::lsp_types::FoldingRangeParams,
     ) -> Result<Option<Vec<FoldingRange>>> {
         let uri = params.text_document.uri.to_string();
-        debug!("folding ranges");
+        trace!("folding ranges");
 
         let folding_ranges = || -> Option<Vec<FoldingRange>> {
             let page = self.page_map.get(&uri)?;
@@ -326,6 +332,40 @@ impl LanguageServer for Backend {
         }();
 
         Ok(folding_ranges)
+    }
+
+    async fn code_action(
+        &self,
+        params: tower_lsp::lsp_types::CodeActionParams,
+    ) -> Result<Option<Vec<CodeActionOrCommand>>> {
+        let code_actions = || -> Option<Vec<CodeActionOrCommand>> {
+            let uri = params.text_document.uri;
+            let page = self.page_map.get(uri.as_str())?;
+            let rope = self.document_map.get(uri.as_str())?;
+            let action_range = range_to_offset(params.range, &rope)?;
+
+            let code_actions = page
+                .code_actions
+                .iter()
+                .filter(|(range, _)| intersects(&action_range, range))
+                .map(|(_range, action)| {
+                    CodeActionOrCommand::Command(Command {
+                        title: action.title.clone(),
+                        command: action.command.to_owned(),
+                        arguments: Some(
+                            action
+                                .args
+                                .iter()
+                                .map(|x| Value::String(x.to_owned()))
+                                .collect(),
+                        ),
+                    })
+                })
+                .collect::<Vec<_>>();
+            Some(code_actions)
+        }();
+
+        Ok(code_actions)
     }
 
     async fn inlay_hint(
@@ -496,31 +536,27 @@ impl LanguageServer for Backend {
     }
 
     async fn execute_command(&self, command: ExecuteCommandParams) -> Result<Option<Value>> {
-        debug!("command executed!");
-
-        /*let workspace_folders = self.workspace_folders.read().await;
-
-        let Some(workspace_folder) = workspace_folders.last() else {
-            log::error!("no workspace folders?");
-            return Ok(None);
-        };
-        let Ok(workspace_folder) = workspace_folder.to_file_path() else {
-            log::error!("workspace folder is not a file");
-            return Ok(None);
-        };*/
+        debug!("command executed: {}", command.command);
 
         let result = (async || match command.command.as_str() {
-            COMMAND_OPEN_SPLIT => {
-                let workspace = command
-                    .arguments
-                    .first()
-                    .and_then(|x| x.as_str())
+            commands::OPEN => {
+                let [workspace, page] = command.arguments.as_slice() else {
+                    return Err(anyhow!(
+                        "wrong arguments to command {}: {:?}",
+                        commands::OPEN,
+                        command.arguments
+                    ));
+                };
+                let workspace = workspace
+                    .as_str()
                     .map(Path::new)
-                    .ok_or_else(|| {
-                        anyhow!("missing parameter, got {:?}", command.arguments.first())
-                    })?;
+                    .ok_or_else(|| anyhow!("wrong parameter workspace: {:?}", workspace))?;
+                let page = page
+                    .as_str()
+                    .and_then(|page| pages::named(page))
+                    .ok_or_else(|| anyhow!("wrong parameter page {:?}", page))?;
 
-                jjmagit_language_server::commands::open_split(workspace)
+                jjmagit_language_server::commands::open_page(workspace, page)
                     .await
                     .map(|p| p.to_str().unwrap().to_owned())
             }
@@ -588,12 +624,14 @@ impl Backend {
 
         let Some(page) = pages::named(&page_name) else {
             error!("Unknown page: {}", page_name);
+            std::fs::write(page_path, format!("Unkown page: {}", page_name))?;
             return Ok(());
         };
 
         let repo = Repo::detect(&repo_path)?.ok_or_else(|| anyhow!("no jj root found"))?;
 
         let mut out = PageWriter::default();
+        // out.debug = true;
         page.render(&mut out, &repo)?;
         let page = out.finish();
         std::fs::write(page_path, &page.text)?;
@@ -636,4 +674,12 @@ fn position_to_offset(position: Position, rope: &Rope) -> Option<usize> {
     let line_char_offset = rope.try_line_to_char(position.line as usize).ok()?;
     let slice = rope.slice(0..line_char_offset + position.character as usize);
     Some(slice.len_bytes())
+}
+
+fn range_to_offset(range: Range, rope: &Rope) -> Option<std::ops::Range<usize>> {
+    Some(position_to_offset(range.start, rope)?..position_to_offset(range.end, rope)?)
+}
+
+fn intersects(range1: &std::ops::Range<usize>, range2: &std::ops::Range<usize>) -> bool {
+    range1.start <= range2.end && range2.start <= range1.end
 }

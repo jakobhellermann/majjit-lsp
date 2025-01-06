@@ -10,12 +10,8 @@ install-extension-vscode: build-extension-vscode
 
 lint:
   cargo clippy
-
-
-
-semantic-tokens:
-  jj config --color never list --include-defaults colors -T 'name.remove_prefix("colors.") ++ "\n"' \
-    | tr -d '"' | awk '{print "\"" $NF "\"," }' | sort | uniq
+  cd editors/vscode && npm run check
+  cd editors/zed && cargo clippy
 
 clean:
   rm editors/vscode/out -fr
