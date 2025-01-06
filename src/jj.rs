@@ -91,6 +91,7 @@ impl Repo {
         };
 
         let revset_aliases_map = load_revset_aliases(settings.config())?;
+        #[allow(clippy::arc_with_non_send_sync)]
         let revset_extensions = Arc::new(RevsetExtensions::new());
         // TODO(config): user disambiguator
         let id_prefix_context = IdPrefixContext::new(Arc::clone(&revset_extensions));
@@ -147,7 +148,7 @@ impl Repo {
         let mut diagnostics = RevsetDiagnostics::new();
         let context = self.revset_parse_context();
         let (expression, modifier) =
-            revset::parse_with_modifier(&mut diagnostics, &revset_string, &context)?;
+            revset::parse_with_modifier(&mut diagnostics, revset_string, &context)?;
         let (None | Some(RevsetModifier::All)) = modifier;
 
         ensure!(diagnostics.is_empty());
@@ -166,7 +167,7 @@ impl Repo {
         let commit_id = self
             .repo
             .view()
-            .get_wc_commit_id(&self.workspace.workspace_id())
+            .get_wc_commit_id(self.workspace.workspace_id())
             .ok_or_else(|| anyhow!("workspace has no checked out commit"))?;
         let commit = self.repo.store().get_commit(commit_id)?;
 
@@ -247,11 +248,11 @@ impl DiffState<'_> {
 }
 
 impl Repo {
-    fn commit_template_language<'a>(&'a self) -> CommitTemplateLanguage<'a> {
+    fn commit_template_language(&self) -> CommitTemplateLanguage<'_> {
         CommitTemplateLanguage::new(
             self.repo.as_ref(),
             &self.path_converter,
-            &self.workspace.workspace_id(),
+            self.workspace.workspace_id(),
             self.revset_parse_context(),
             &self.id_prefix_context,
             self.immutable_expression(),

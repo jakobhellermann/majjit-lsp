@@ -92,7 +92,7 @@ pub struct FormatterAdapter<'a> {
     writer: &'a mut PageWriter,
     debug: bool,
 }
-impl<'a> FormatterAdapter<'a> {
+impl FormatterAdapter<'_> {
     pub fn debug(self) -> Self {
         FormatterAdapter {
             writer: self.writer,
@@ -100,7 +100,7 @@ impl<'a> FormatterAdapter<'a> {
         }
     }
 }
-impl<'a> std::io::Write for FormatterAdapter<'a> {
+impl std::io::Write for FormatterAdapter<'_> {
     fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
         self.writer.write(buf)
     }
@@ -109,7 +109,7 @@ impl<'a> std::io::Write for FormatterAdapter<'a> {
         self.writer.flush()
     }
 }
-impl<'a> Formatter for FormatterAdapter<'a> {
+impl Formatter for FormatterAdapter<'_> {
     fn raw(&mut self) -> std::io::Result<Box<dyn std::io::Write + '_>> {
         Ok(Box::new(&mut self.writer))
     }
@@ -117,7 +117,7 @@ impl<'a> Formatter for FormatterAdapter<'a> {
     fn push_label(&mut self, label: &str) -> std::io::Result<()> {
         if self.debug {
             self.writer.buf.push_str(label);
-            self.writer.buf.push_str("(");
+            self.writer.buf.push('(');
         }
 
         let token = semantic_token::get_or_default(label);
@@ -132,9 +132,9 @@ impl<'a> Formatter for FormatterAdapter<'a> {
             if has_newline {
                 self.writer.buf.truncate(self.writer.buf.len() - 1);
             }
-            self.writer.buf.push_str(")");
+            self.writer.buf.push(')');
             if has_newline {
-                self.writer.buf.push_str("\n");
+                self.writer.buf.push('\n');
             }
         }
         self.writer.labels.pop(&self.writer.buf);

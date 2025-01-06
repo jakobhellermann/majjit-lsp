@@ -234,7 +234,7 @@ impl LanguageServer for Backend {
                         delta_line,
                         delta_start,
                         length: range.len() as u32,
-                        token_type: token_type as u32,
+                        token_type,
                         token_modifiers_bitset: 0,
                     });
                     pre_line = line;
@@ -278,7 +278,7 @@ impl LanguageServer for Backend {
                             start
                         },
                         length: token.0.len() as u32,
-                        token_type: token.1 as u32,
+                        token_type: token.1,
                         token_modifiers_bitset: 0,
                     });
                     prev_line = line;
