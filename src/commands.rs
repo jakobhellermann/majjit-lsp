@@ -6,24 +6,20 @@ use std::path::{Path, PathBuf};
 use tokio::fs::File;
 use tokio::io::AsyncWriteExt;
 
-pub async fn open_page(
-    workspace: &Path,
-    page: &dyn Page,
-    argument: Option<&str>,
-) -> Result<PathBuf> {
+pub async fn open_page(workspace: &Path, page: &dyn Page, arguments: &[&str]) -> Result<PathBuf> {
     let (page_path, page) = {
         let repo = Repo::detect(workspace)?.ok_or_else(|| anyhow!("no jj root found"))?;
-        let page_path = repo
-            .workspace_dir()
-            .join(format!(".jj/{}.jjmagit", page.name()));
+
+        let page_path = pages::path::get_path(repo.workspace_dir(), page, arguments);
 
         let mut out = PageWriter::default();
-        pages::Status.render(&mut out, &repo, argument)?;
+        page.render(&mut out, &repo, arguments)?;
 
         let page = out.finish().text;
         (page_path, page)
     };
 
+    tokio::fs::create_dir_all(&page_path.parent().unwrap()).await?;
     let mut file = File::create(&page_path).await?;
     file.write_all(page.as_bytes()).await?;
 

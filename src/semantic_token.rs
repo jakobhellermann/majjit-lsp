@@ -1,4 +1,4 @@
-use log::warn;
+use log::trace;
 use tower_lsp::lsp_types::SemanticTokenType;
 
 macro_rules! semantic_tokens {
@@ -27,7 +27,7 @@ pub fn try_get(name: &str) -> Option<u32> {
 }
 pub fn get_or_default(name: &str) -> u32 {
     try_get(name).unwrap_or_else(|| {
-        warn!("unknown semantic scope: {name}");
+        trace!("unknown semantic scope: {name}");
         0
     })
 }

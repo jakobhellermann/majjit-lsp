@@ -271,4 +271,12 @@ impl CodeAction {
             args: vec![commit.change_id().to_string()],
         }
     }
+
+    pub fn annotate_before() -> Self {
+        CodeAction {
+            title: "Annotate before this commit".into(),
+            command: "todo",
+            args: vec![],
+        }
+    }
 }

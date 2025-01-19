@@ -17,15 +17,16 @@ impl Page for Status {
         "status"
     }
 
-    fn render(&self, out: &mut PageWriter, repo: &Repo, _: Option<&str>) -> Result<()> {
+    fn render(&self, out: &mut PageWriter, repo: &Repo, _: &[&str]) -> Result<()> {
         let commit = repo.current_commit()?;
 
         let diff_state = repo.diff(&commit)?;
         let diff = diff_state.diff(&EverythingMatcher)?;
 
         write!(out.labelled(0), "Head: ")?;
+
         repo.write_log(&mut out.formatter(), &commit)?;
-        writeln!(out, "\n")?;
+        writeln!(out, "")?;
 
         out.push_code_action(CodeAction::move_to_commit());
         write!(out.labelled(0), "Changes")?;
@@ -100,7 +101,7 @@ impl Page for Status {
             out.push_code_actions(vec![CodeAction::new(&commit), CodeAction::abandon(&commit)]);
             repo.write_log(&mut out.formatter(), &commit)?;
             out.pop_code_action();
-            writeln!(out)?;
+            // writeln!(out)?;
 
             let diff = repo.diff(&commit)?;
             diff.write_summary(&mut out.formatter())?;

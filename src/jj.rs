@@ -8,6 +8,7 @@ use jj_cli::revset_util::{self, RevsetExpressionEvaluator};
 use jj_cli::template_builder::{self, TemplateLanguage};
 use jj_cli::template_parser::{TemplateAliasesMap, TemplateDiagnostics};
 use jj_cli::templater::{PropertyPlaceholder, TemplateRenderer};
+use jj_lib::annotate::FileAnnotation;
 use jj_lib::commit::Commit;
 use jj_lib::config::{ConfigGetError, ConfigGetResultExt, ConfigNamePathBuf, StackedConfig};
 use jj_lib::conflicts::{materialized_diff_stream, ConflictMarkerStyle, MaterializedTreeDiffEntry};
@@ -124,6 +125,13 @@ impl Repo {
         Ok(Some(this))
     }
 
+    pub fn settings(&self) -> &UserSettings {
+        &self.settings
+    }
+    pub fn inner(&self) -> &dyn jj_lib::repo::Repo {
+        self.repo.as_ref()
+    }
+
     pub fn write_log(&self, f: &mut dyn Formatter, commit: &Commit) -> Result<()> {
         let language = self.commit_template_language();
         let template_string = self.settings.get_string("templates.log")?;
@@ -136,6 +144,43 @@ impl Repo {
         template.format(commit, f)?;
 
         Ok(())
+    }
+
+    pub fn settings_commit_template(
+        &self,
+        settings_path: &'static str,
+    ) -> Result<TemplateRenderer<'_, Commit>> {
+        let language = self.commit_template_language();
+        let annotate_commit_summary_text = self.settings.get_string(settings_path)?;
+        let template = self.parse_template(
+            &language,
+            &annotate_commit_summary_text,
+            CommitTemplateLanguage::wrap_commit,
+        )?;
+
+        Ok(template)
+    }
+
+    pub fn annotation(&self, starting_commit: &Commit, file_path: &str) -> Result<FileAnnotation> {
+        let file_path = self.path_converter.parse_file_path(file_path)?;
+        let file_value = starting_commit.tree()?.path_value(&file_path)?;
+        let ui_path = self.path_converter.format_file_path(&file_path);
+        if file_value.is_absent() {
+            return Err(anyhow!("Path does not belong to repository: {ui_path}"));
+        }
+        if file_value.is_tree() {
+            return Err(anyhow!("Path exists but is not a regular file: {ui_path}"));
+        }
+
+        let domain = RevsetExpression::all();
+        let annotation = jj_lib::annotate::get_annotation_for_file(
+            self.repo.as_ref(),
+            &starting_commit,
+            &domain,
+            &file_path,
+        )?;
+
+        Ok(annotation)
     }
 
     pub fn log(&self) -> Result<Vec<Commit>> {
@@ -167,6 +212,12 @@ impl Repo {
         );
 
         Ok(evaluator)
+    }
+
+    pub fn revset_single(&self, revset_string: &str) -> Result<Commit> {
+        let expression = self.revset_expression(revset_string)?;
+        let commit = evaluate_revset_to_single_commit(revset_string, &expression)?;
+        Ok(commit)
     }
 
     pub fn current_commit(&self) -> Result<Commit> {
@@ -391,4 +442,18 @@ fn load_template_aliases(stacked_config: &StackedConfig) -> Result<TemplateAlias
         }
     }
     Ok(aliases_map)
+}
+
+pub(super) fn evaluate_revset_to_single_commit<'a>(
+    revision_str: &str,
+    expression: &RevsetExpressionEvaluator<'_>,
+) -> Result<Commit> {
+    let mut iter = expression.evaluate_to_commits()?.fuse();
+    match (iter.next(), iter.next()) {
+        (Some(commit), None) => Ok(commit?),
+        (None, _) => Err(anyhow!(
+            r#"Revset "{revision_str}" didn't resolve to any revisions"#
+        )),
+        (Some(_), Some(_)) => Err(anyhow!("{revision_str} resolved to multiple commits")),
+    }
 }

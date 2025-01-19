@@ -1,5 +1,5 @@
 #![allow(clippy::redundant_closure_call)]
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use anyhow::{anyhow, Context};
 use dashmap::DashMap;
@@ -7,7 +7,7 @@ use jjmagit_language_server::jj::Repo;
 use jjmagit_language_server::page_writer::{Page, PageWriter};
 use jjmagit_language_server::pages::{self};
 use jjmagit_language_server::semantic_token::LEGEND_TYPE;
-use log::{debug, error, trace};
+use log::{debug, trace};
 use ropey::Rope;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -27,7 +27,6 @@ struct Backend {
 }
 
 mod commands {
-
     pub const OPEN: &str = "open";
 }
 
@@ -557,9 +556,10 @@ impl LanguageServer for Backend {
                     .ok_or_else(|| anyhow!("wrong parameter page {:?}", page))?;
                 let argument = value_as_option(file_path)
                     .map(|x| x.as_str().context("invalid parameter file_path"))
-                    .transpose()?;
+                    .transpose()?
+                    .unwrap_or("");
 
-                jjmagit_language_server::commands::open_page(workspace, page, argument)
+                jjmagit_language_server::commands::open_page(workspace, page, &[argument])
                     .await
                     .map(|p| p.to_str().unwrap().to_owned())
             }
@@ -595,47 +595,22 @@ struct TextDocumentItem<'a> {
     version: Option<i32>,
 }
 
-fn jjmagit_file_name(uri: &Url) -> Option<(PathBuf, PathBuf, String)> {
-    let path = uri.to_file_path().ok()?;
-
-    let dot_jj = path.parent()?;
-    if dot_jj.file_name()? != ".jj" {
-        return None;
-    }
-    let repo_path = dot_jj.parent()?;
-
-    let file_name = path.file_name()?.to_str()?;
-    let (name, extension) = file_name.split_once('.')?;
-    let name = name.to_owned();
-
-    if extension != "jjmagit" {
-        return None;
-    }
-
-    Some((repo_path.to_owned(), path, name))
-}
-
 impl Backend {
     async fn on_change(&self, params: TextDocumentItem<'_>) -> anyhow::Result<()> {
         let rope = ropey::Rope::from_str(params.text);
         self.document_map.insert(params.uri.to_string(), rope);
 
-        let Some((repo_path, page_path, page_name)) = jjmagit_file_name(&params.uri) else {
-            error!("Unexpected filename: {}", params.uri);
-            return Ok(());
-        };
-
-        let Some(page) = pages::named(&page_name) else {
-            error!("Unknown page: {}", page_name);
-            std::fs::write(page_path, format!("Unkown page: {}", page_name))?;
-            return Ok(());
-        };
+        let page_path = params
+            .uri
+            .to_file_path()
+            .map_err(|()| anyhow!("Expected path, got url"))?;
+        let (repo_path, page, arguments) = pages::path::parse_path(&page_path)?;
+        let arguments: Vec<_> = arguments.iter().map(String::as_str).collect();
 
         let repo = Repo::detect(&repo_path)?.ok_or_else(|| anyhow!("no jj root found"))?;
 
         let mut out = PageWriter::default();
-        // out.debug = true;
-        page.render(&mut out, &repo, None)?;
+        page.render(&mut out, &repo, &arguments)?;
         let page = out.finish();
         std::fs::write(page_path, &page.text)?;
 

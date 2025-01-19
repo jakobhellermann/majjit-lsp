@@ -23,6 +23,8 @@ export async function activate(context: ExtensionContext) {
   const traceOutputChannel = window.createOutputChannel("jjmagit language server trace");
   const command = process.env.SERVER_PATH || "jjmagit-language-server";
 
+  outputChannel.show();
+
   const run: Executable = {
     command,
     options: {
@@ -81,16 +83,16 @@ async function openPage(page: PageName, includePath: boolean = false) {
 
   let argument = null;
   if (includePath) {
-    const filePath = vscode.window.activeTextEditor?.document?.uri?.fsPath;
-    if (!filePath) {
+    const currentlyOpen = vscode.window.activeTextEditor?.document?.uri;
+    if (!currentlyOpen || currentlyOpen.scheme != "file") {
       return vscode.window.showErrorMessage("No editor open");
     }
+    const filePath = currentlyOpen.fsPath;
 
     if (!filePath.startsWith(workspaceFolder)) {
       return vscode.window.showErrorMessage(`File '${filePath}' doesn't belong to workspace '${workspaceFolder}'`);
     }
     argument = filePath.substring(workspaceFolder.length + 1);
-    vscode.window.showInformationMessage(argument);
   }
 
 
