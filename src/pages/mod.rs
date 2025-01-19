@@ -17,5 +17,5 @@ pub fn named(name: &str) -> Option<&dyn Page> {
 pub trait Page: Send + Sync {
     fn name(&self) -> &'static str;
 
-    fn render(&self, out: &mut PageWriter, repo: &Repo) -> Result<()>;
+    fn render(&self, out: &mut PageWriter, repo: &Repo, argument: Option<&str>) -> Result<()>;
 }

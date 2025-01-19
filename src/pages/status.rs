@@ -17,7 +17,7 @@ impl Page for Status {
         "status"
     }
 
-    fn render(&self, out: &mut PageWriter, repo: &Repo) -> Result<()> {
+    fn render(&self, out: &mut PageWriter, repo: &Repo, _: Option<&str>) -> Result<()> {
         let commit = repo.current_commit()?;
 
         let diff_state = repo.diff(&commit)?;

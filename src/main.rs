@@ -1,7 +1,7 @@
 #![allow(clippy::redundant_closure_call)]
 use std::path::{Path, PathBuf};
 
-use anyhow::anyhow;
+use anyhow::{anyhow, Context};
 use dashmap::DashMap;
 use jjmagit_language_server::jj::Repo;
 use jjmagit_language_server::page_writer::{Page, PageWriter};
@@ -540,7 +540,7 @@ impl LanguageServer for Backend {
 
         let result = (async || match command.command.as_str() {
             commands::OPEN => {
-                let [workspace, page] = command.arguments.as_slice() else {
+                let [workspace, page, file_path] = command.arguments.as_slice() else {
                     return Err(anyhow!(
                         "wrong arguments to command {}: {:?}",
                         commands::OPEN,
@@ -555,8 +555,11 @@ impl LanguageServer for Backend {
                     .as_str()
                     .and_then(|page| pages::named(page))
                     .ok_or_else(|| anyhow!("wrong parameter page {:?}", page))?;
+                let argument = value_as_option(file_path)
+                    .map(|x| x.as_str().context("invalid parameter file_path"))
+                    .transpose()?;
 
-                jjmagit_language_server::commands::open_page(workspace, page)
+                jjmagit_language_server::commands::open_page(workspace, page, argument)
                     .await
                     .map(|p| p.to_str().unwrap().to_owned())
             }
@@ -632,7 +635,7 @@ impl Backend {
 
         let mut out = PageWriter::default();
         // out.debug = true;
-        page.render(&mut out, &repo)?;
+        page.render(&mut out, &repo, None)?;
         let page = out.finish();
         std::fs::write(page_path, &page.text)?;
 
@@ -682,4 +685,11 @@ fn range_to_offset(range: Range, rope: &Rope) -> Option<std::ops::Range<usize>> 
 
 fn intersects(range1: &std::ops::Range<usize>, range2: &std::ops::Range<usize>) -> bool {
     range1.start <= range2.end && range2.start <= range1.end
+}
+
+fn value_as_option(val: &Value) -> Option<&Value> {
+    match val {
+        Value::Null => None,
+        other => Some(other),
+    }
 }
