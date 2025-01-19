@@ -32,6 +32,10 @@
 			{
 				"command": "jjmagit.open.status",
 				"title": "jjmagit: Status"
+			},
+			{
+				"command": "jjmagit.open.annotate",
+				"title": "jjmagit: Blame (jj file annotate)"
 			}
 		],
 		"configuration": {

@@ -12,12 +12,15 @@ import {
   ServerOptions,
 } from "vscode-languageclient/node";
 
-type PageName = "status";
+type PageName = "status" | "annotate";
+const allPages: PageName[] = ["status", "annotate"];
 
 let client: LanguageClient;
 
+let outputChannel: vscode.OutputChannel;
 export async function activate(context: ExtensionContext) {
-  const traceOutputChannel = window.createOutputChannel("jjmagit Language Server trace");
+  outputChannel = window.createOutputChannel("jjmagit language server");
+  const traceOutputChannel = window.createOutputChannel("jjmagit language server trace");
   const command = process.env.SERVER_PATH || "jjmagit-language-server";
 
   const run: Executable = {
@@ -35,6 +38,7 @@ export async function activate(context: ExtensionContext) {
   };
   let clientOptions: LanguageClientOptions = {
     documentSelector: [{ scheme: "file", language: "jjmagit" }],
+    outputChannel,
     traceOutputChannel,
   };
 
@@ -44,9 +48,10 @@ export async function activate(context: ExtensionContext) {
   context.subscriptions.push(vscode.workspace.onDidOpenTextDocument(onDidOpenTextDocument));
   context.subscriptions.push(vscode.workspace.onDidChangeTextDocument(e => onDidChangeTextDocument(e.document)));
 
-  for (const page of ["status"] satisfies PageName[]) {
-    context.subscriptions.push(vscode.commands.registerCommand(`jjmagit.open.${page}`, () => openPage(page)));
-  }
+  let registerPage = (page: PageName, f: () => void) => context.subscriptions.push(vscode.commands.registerCommand(`jjmagit.open.${page}`, f));
+
+  registerPage("status", () => openPage("status"));
+  registerPage("annotate", () => openPage("annotate", true));
 }
 
 export function deactivate(): Thenable<void> | undefined {
@@ -54,7 +59,6 @@ export function deactivate(): Thenable<void> | undefined {
 
   return client.stop();
 }
-
 
 
 async function onDidChangeTextDocument(document: vscode.TextDocument) {
@@ -67,19 +71,40 @@ async function onDidOpenTextDocument(document: vscode.TextDocument) {
   }
 }
 
-
-async function openPage(page: PageName) {
+async function openPage(page: PageName, includePath: boolean = false) {
   let workspaceFolder = vscode.workspace.workspaceFolders?.[0]?.uri?.fsPath;
   if (!workspaceFolder) {
     vscode.window.showErrorMessage("No workspace folder found");
     return;
   }
 
+
+  let argument = null;
+  if (includePath) {
+    const filePath = vscode.window.activeTextEditor?.document?.uri?.fsPath;
+    if (!filePath) {
+      return vscode.window.showErrorMessage("No editor open");
+    }
+
+    if (!filePath.startsWith(workspaceFolder)) {
+      return vscode.window.showErrorMessage(`File '${filePath}' doesn't belong to workspace '${workspaceFolder}'`);
+    }
+    argument = filePath.substring(workspaceFolder.length + 1);
+    vscode.window.showInformationMessage(argument);
+  }
+
+
   let args = {
     command: "open",
-    arguments: [workspaceFolder, page]
+    arguments: [workspaceFolder, page, argument],
   } satisfies ExecuteCommandParams;
-  let response = await client.sendRequest("workspace/executeCommand", args) as string;
+  let response = await client.sendRequest("workspace/executeCommand", args);
+
+  if (typeof response !== "string") {
+    vscode.window.showErrorMessage("Could not execute command, check jjmagit LSP logs");
+    outputChannel.show();
+    return;
+  }
 
   let document = await vscode.workspace.openTextDocument(vscode.Uri.file(response));
   let editor = await vscode.window.showTextDocument(document);
