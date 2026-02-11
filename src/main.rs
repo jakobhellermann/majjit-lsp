@@ -615,6 +615,9 @@ impl Backend {
         let mut out = PageWriter::default();
         page.render(&mut out, &repo, &arguments)?;
         let page = out.finish();
+        if let Some(parent) = page_path.parent() {
+            std::fs::create_dir_all(&parent)?;
+        }
         std::fs::write(page_path, &page.text)?;
 
         let changed = page.text != params.text;
