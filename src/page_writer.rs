@@ -2,8 +2,8 @@ use jj_cli::formatter::{Formatter, PlainTextFormatter};
 use jj_lib::commit::Commit;
 use tower_lsp::lsp_types::Url;
 
-use crate::semantic_token;
 use crate::span::Span;
+use crate::{commands, semantic_token};
 use std::fmt::Write as _;
 
 type TokenType = u32;
@@ -250,7 +250,7 @@ impl CodeAction {
     pub fn move_file_to_commit(pretty_path: String) -> Self {
         CodeAction {
             title: format!("Move {} to first commit", pretty_path),
-            command: "todo",
+            command: commands::TODO,
             args: vec![pretty_path],
         }
     }

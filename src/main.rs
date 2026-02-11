@@ -3,6 +3,7 @@ use std::path::Path;
 
 use anyhow::{Context, anyhow};
 use dashmap::DashMap;
+use jjmagit_language_server::commands;
 use jjmagit_language_server::jj::Repo;
 use jjmagit_language_server::page_writer::{Page, PageWriter};
 use jjmagit_language_server::pages::{self};
@@ -26,10 +27,6 @@ struct Backend {
     workspace_folders: RwLock<Vec<Url>>,
 }
 
-mod commands {
-    pub const OPEN: &str = "open";
-}
-
 #[tower_lsp::async_trait]
 impl LanguageServer for Backend {
     async fn initialize(&self, _: InitializeParams) -> Result<InitializeResult> {
@@ -51,7 +48,7 @@ impl LanguageServer for Backend {
                 code_action_provider: Some(CodeActionProviderCapability::Simple(true)),
                 completion_provider: None,
                 execute_command_provider: Some(ExecuteCommandOptions {
-                    commands: vec![commands::OPEN.to_string()],
+                    commands: vec![commands::OPEN.to_string(), commands::TODO.to_string()],
                     work_done_progress_options: Default::default(),
                 }),
 
@@ -563,14 +560,21 @@ impl LanguageServer for Backend {
 
                 jjmagit_language_server::commands::open_page(workspace, page, &[argument])
                     .await
-                    .map(|p| p.to_str().unwrap().to_owned())
+                    .map(|p| Value::String(p.to_str().unwrap().to_owned()))
+            }
+            commands::TODO => {
+                self.client
+                    .show_message(MessageType::ERROR, "todo command")
+                    .await;
+
+                Ok(Value::Null)
             }
             other => Err(anyhow!("unknown command: {}", other)),
         })()
         .await;
 
         match result {
-            Ok(res) => Ok(Some(res.into())),
+            Ok(res) => Ok(Some(res)),
             Err(e) => {
                 log::error!("failed to run command: {e}");
                 Ok(None)

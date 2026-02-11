@@ -6,6 +6,9 @@ use std::path::{Path, PathBuf};
 use tokio::fs::File;
 use tokio::io::AsyncWriteExt;
 
+pub const OPEN: &str = "open";
+pub const TODO: &str = "todo";
+
 pub async fn open_page(workspace: &Path, page: &dyn Page, arguments: &[&str]) -> Result<PathBuf> {
     let (page_path, page) = {
         let repo = Repo::detect(workspace)?.ok_or_else(|| anyhow!("no jj root found"))?;
