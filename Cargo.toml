@@ -24,3 +24,6 @@ jj-lib = "0.38"
 jj-cli = "0.38"
 futures-executor = "0.3"
 chrono = { version = "0.4", default-features = false }
+
+[profile.dev.package."*"]
+opt-level = 2
