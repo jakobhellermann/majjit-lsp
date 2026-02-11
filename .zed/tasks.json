@@ -1,0 +1,8 @@
+[
+  {
+    "label": "JJMagit: Status",
+    "command": "zeditor",
+    "args": [".jj/status.jjmagit"],
+    "reveal": "never",
+  },
+]
