@@ -9,14 +9,18 @@ fn main() -> Result<()> {
     let repo = Repo::detect_cwd()?.unwrap();
 
     let mut out = PageWriter::default();
+    out.debug = true;
 
-    out.labels.push(&out.buf, 0);
+    let status = pages::Status;
+    status.render(&mut out, &repo, &[])?;
+
+    /*out.labels.push(&out.buf, 0);
     write!(out, "aaa");
     out.labels.push(&out.buf, 1);
     write!(out, "bbb");
     out.labels.pop(&out.buf);
     write!(out, "aaa");
-    out.labels.pop(&out.buf);
+    out.labels.pop(&out.buf);*/
 
     let page = out.finish();
     println!("{}", page.text);
