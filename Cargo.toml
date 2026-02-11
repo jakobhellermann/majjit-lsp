@@ -7,20 +7,20 @@ edition = "2024"
 
 [dependencies]
 # chumsky = "0.9.3"
-env_logger = "0.11.5"
-ropey = "1.5.0"
-serde_json = "1.0.78"
-tokio = { version = "1.17.0", features = ["full"] }
-tower-lsp = { version = "0.20.0", features = ["proposed"] }
+env_logger = "0.11"
+ropey = "1.6"
+serde_json = "1.0"
+tokio = { version = "1.49", features = ["full"] }
+tower-lsp = { version = "0.20", features = ["proposed"] }
 serde = { version = "1.0", features = ["derive"] }
 dashmap = "6.1.0"
-log = "0.4.14"
-im-rc = "15.0.0"
-oxc_index = "0.36.0"
-anyhow = "1.0.93"
-thiserror = "2.0.3"
-rust-lapper = "1.1.0"
-jj-lib = "0.25.0"
-jj-cli = "0.25.0"
+log = "0.4"
+im-rc = "15.1"
+oxc_index = "4.1"
+anyhow = "1.0"
+thiserror = "2.0"
+rust-lapper = "1.2"
+jj-lib = "0.38"
+jj-cli = "0.38"
 futures-executor = "0.3"
-chrono = { version = "0.4.39", default-features = false }
+chrono = { version = "0.4", default-features = false }

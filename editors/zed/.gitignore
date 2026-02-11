@@ -2,3 +2,4 @@
 /target
 /grammars
 /extension.toml
+/extension.wasm

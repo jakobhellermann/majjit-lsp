@@ -1,8 +1,7 @@
 use anyhow::{Result, anyhow};
+use jj_cli::commit_templater::AnnotationLine;
 use jj_cli::templater::TemplateRenderer;
-use jj_lib::annotate::FileAnnotation;
-use jj_lib::commit::Commit;
-use std::io::Write;
+use jj_lib::annotate::{FileAnnotation, LineOrigin};
 
 use crate::jj::Repo;
 use crate::page_writer::{CodeAction, PageWriter};
@@ -22,7 +21,7 @@ impl Page for Annotate {
         };
 
         let starting_commit = repo.revset_single("@")?;
-        let template = repo.settings_commit_template("templates.annotate_commit_summary")?;
+        let template = repo.settings_annotation_template("templates.file_annotate")?;
         let annotation = repo.annotation(&starting_commit, file_path)?;
 
         render_file_annotation(repo.inner(), out, &template, &annotation)?;
@@ -34,17 +33,30 @@ impl Page for Annotate {
 fn render_file_annotation(
     repo: &dyn jj_lib::repo::Repo,
     out: &mut PageWriter,
-    template_render: &TemplateRenderer<Commit>,
+    template_render: &TemplateRenderer<AnnotationLine>,
     annotation: &FileAnnotation,
 ) -> Result<()> {
-    for (line_no, (commit_id, line)) in annotation.lines().enumerate() {
+    let mut last_id = None;
+    let default_line_origin = LineOrigin {
+        commit_id: repo.store().root_commit_id().clone(),
+        line_number: 0,
+    };
+    for (line_number, (line_origin, content)) in annotation.line_origins().enumerate() {
         out.push_code_action(CodeAction::annotate_before());
-        let commit_id = commit_id.expect("should reached to the empty ancestor");
 
-        let commit = repo.store().get_commit(commit_id)?;
-        template_render.format(&commit, &mut out.formatter())?;
-        write!(out, " {:>4}: ", line_no + 1)?;
-        out.write_all(line)?;
+        let line_origin = line_origin.unwrap_or(&default_line_origin);
+        let commit = repo.store().get_commit(&line_origin.commit_id)?;
+        let first_line_in_hunk = last_id != Some(&line_origin.commit_id);
+        let annotation_line = AnnotationLine {
+            commit,
+            content: content.to_owned(),
+            line_number: line_number + 1,
+            original_line_number: line_origin.line_number + 1,
+            first_line_in_hunk,
+        };
+        last_id = Some(&line_origin.commit_id);
+
+        template_render.format(&annotation_line, &mut out.formatter())?;
 
         out.pop_code_action();
     }

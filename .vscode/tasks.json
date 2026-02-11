@@ -19,7 +19,6 @@
       "type": "process",
       "command": ["just"],
       "args": ["build-lsp"],
-      "problemMatcher": "$rustc",
       "presentation": {
         "reveal": "silent",
       },

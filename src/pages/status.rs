@@ -35,15 +35,11 @@ impl Page for Status {
         writeln!(out, " ({})", diff.len(),)?;
 
         for item in diff {
-            let (before, after) = item.values?;
-            let before_path = item.path.source();
-            let after_path = item.path.target();
+            let diff = item.values?;
 
-            let pretty_path = match item.path.copy_operation() {
-                Some(_) => repo
-                    .path_converter()
-                    .format_copied_path(before_path, after_path),
-                None => repo.path_converter().format_file_path(after_path),
+            let pretty_path = match item.path.to_diff() {
+                Some(paths) => repo.path_converter().format_copied_path(paths),
+                None => repo.path_converter().format_file_path(item.path.target()),
             };
 
             out.push_fold();
@@ -59,15 +55,15 @@ impl Page for Status {
                     "{sigil} {pretty_path}"
                 )?;
             } else {
-                let path = repo.path_converter().format_file_path(after_path);
+                let path = repo.path_converter().format_file_path(item.path.target());
 
                 let base = repo.workspace_dir();
 
                 let target = GotoDefinitionTarget {
-                    target: Url::from_file_path(after_path.to_fs_path(base)?).unwrap(),
+                    target: Url::from_file_path(item.path.target().to_fs_path(base)?).unwrap(),
                 };
                 out.goto_def.push(&out.buf, target);
-                match (before.is_present(), after.is_present()) {
+                match (diff.before.is_present(), diff.after.is_present()) {
                     (true, true) => {
                         let label = semantic_token::get("modified");
                         writeln!(out.labelled(label), "M {path}")?

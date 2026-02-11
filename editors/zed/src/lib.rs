@@ -14,7 +14,7 @@ impl zed::Extension for JJMagit {
     ) -> Result<zed_extension_api::Command> {
         let command = worktree
             .which("jjmagit-language-server")
-            .ok_or_else("Couldn't find jjmagit-language-server binary")?;
+            .ok_or("Couldn't find jjmagit-language-server binary")?;
         Ok(zed_extension_api::Command {
             command,
             args: vec![],

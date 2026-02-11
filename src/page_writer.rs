@@ -144,7 +144,7 @@ impl Formatter for FormatterAdapter<'_> {
         Ok(Box::new(&mut self.writer))
     }
 
-    fn push_label(&mut self, label: &str) -> std::io::Result<()> {
+    fn push_label(&mut self, label: &str) {
         if self.debug {
             self.writer.buf.push_str(label);
             self.writer.buf.push('(');
@@ -153,10 +153,9 @@ impl Formatter for FormatterAdapter<'_> {
         let token = semantic_token::get_or_default(label);
 
         self.writer.labels.push(&self.writer.buf, token);
-        Ok(())
     }
 
-    fn pop_label(&mut self) -> std::io::Result<()> {
+    fn pop_label(&mut self) {
         if self.debug {
             let has_newline = self.writer.buf.strip_suffix("\n").is_some();
             if has_newline {
@@ -168,7 +167,10 @@ impl Formatter for FormatterAdapter<'_> {
             }
         }
         self.writer.labels.pop(&self.writer.buf);
-        Ok(())
+    }
+
+    fn maybe_color(&self) -> bool {
+        true
     }
 }
 

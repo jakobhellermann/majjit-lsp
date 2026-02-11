@@ -1,32 +1,37 @@
 use chrono::TimeZone as _;
 use futures_executor::block_on_stream;
-use jj_cli::commit_templater::{CommitTemplateLanguage, CommitTemplateLanguageExtension};
+use jj_cli::cli_util::default_ignored_remote_name;
+use jj_cli::commit_templater::{
+    AnnotationLine, CommitTemplateLanguage, CommitTemplateLanguageExtension,
+};
 use jj_cli::config::{ConfigEnv, config_from_environment, default_config_layers};
 use jj_cli::diff_util::{self, UnifiedDiffOptions, show_diff_summary};
 use jj_cli::formatter::Formatter;
 use jj_cli::revset_util::{self, RevsetExpressionEvaluator};
 use jj_cli::template_builder::{self, TemplateLanguage};
 use jj_cli::template_parser::{TemplateAliasesMap, TemplateDiagnostics};
-use jj_cli::templater::{PropertyPlaceholder, TemplateRenderer};
-use jj_lib::annotate::FileAnnotation;
+use jj_cli::templater::{TemplateRenderer, WrapTemplateProperty};
+use jj_lib::annotate::{FileAnnotation, FileAnnotator};
 use jj_lib::commit::Commit;
 use jj_lib::config::{ConfigGetError, ConfigGetResultExt, ConfigNamePathBuf, StackedConfig};
 use jj_lib::conflicts::{ConflictMarkerStyle, MaterializedTreeDiffEntry, materialized_diff_stream};
 use jj_lib::copies::CopyRecords;
+use jj_lib::diff_presentation::LineCompareMode;
 use jj_lib::id_prefix::IdPrefixContext;
 use jj_lib::matchers::{EverythingMatcher, Matcher};
+use jj_lib::merge::Diff;
 use jj_lib::merged_tree::MergedTree;
+use jj_lib::ref_name::RemoteName;
 use jj_lib::repo::{ReadonlyRepo, Repo as _, StoreFactories};
 use jj_lib::repo_path::RepoPathUiConverter;
 use jj_lib::revset::{
     self, RevsetAliasesMap, RevsetDiagnostics, RevsetExpression, RevsetExtensions,
-    RevsetIteratorExt, RevsetModifier, RevsetParseContext, RevsetWorkspaceContext,
-    UserRevsetExpression,
+    RevsetIteratorExt, RevsetParseContext, RevsetWorkspaceContext, UserRevsetExpression,
 };
 use jj_lib::settings::UserSettings;
 use jj_lib::workspace::Workspace;
+use std::collections::HashMap;
 use std::path::Path;
-use std::rc::Rc;
 use std::sync::Arc;
 
 use anyhow::{Result, anyhow, ensure};
@@ -42,15 +47,16 @@ pub struct Repo {
     revset_aliases_map: RevsetAliasesMap,
     revset_extensions: Arc<RevsetExtensions>,
     template_aliases_map: TemplateAliasesMap,
+    default_ignored_remote: Option<&'static RemoteName>,
+    revsets_use_glob_by_default: bool,
 
-    immutable_heads_expression: Rc<UserRevsetExpression>,
+    immutable_heads_expression: Arc<UserRevsetExpression>,
 }
 
 pub struct DiffState<'a> {
     repo: &'a Repo,
     copy_records: CopyRecords,
-    from_tree: MergedTree,
-    to_tree: MergedTree,
+    tree: Diff<MergedTree>,
 }
 
 impl Repo {
@@ -71,7 +77,7 @@ impl Repo {
             return Ok(None);
         };
 
-        let config_env = ConfigEnv::from_environment()?;
+        let config_env = ConfigEnv::from_environment();
         let mut config = config_from_environment(default_config_layers());
         // TODO(config): workspace loader
         config_env.reload_user_config(&mut config)?;
@@ -100,6 +106,9 @@ impl Repo {
 
         let template_aliases_map = load_template_aliases(settings.config())?;
 
+        let default_ignored_remote = default_ignored_remote_name(workspace.repo_loader().store());
+        let revsets_use_glob_by_default = settings.get("ui.revsets-use-glob-by-default")?;
+
         let mut this = Repo {
             repo,
             workspace,
@@ -109,6 +118,8 @@ impl Repo {
             revset_aliases_map,
             revset_extensions,
             template_aliases_map,
+            default_ignored_remote,
+            revsets_use_glob_by_default,
             immutable_heads_expression: RevsetExpression::root(),
         };
 
@@ -135,11 +146,7 @@ impl Repo {
     pub fn write_log(&self, f: &mut dyn Formatter, commit: &Commit) -> Result<()> {
         let language = self.commit_template_language();
         let template_string = self.settings.get_string("templates.log")?;
-        let template = self.parse_template(
-            &language,
-            &template_string,
-            CommitTemplateLanguage::wrap_commit,
-        )?;
+        let template = self.parse_template(&language, &template_string)?;
 
         template.format(commit, f)?;
 
@@ -152,18 +159,24 @@ impl Repo {
     ) -> Result<TemplateRenderer<'_, Commit>> {
         let language = self.commit_template_language();
         let annotate_commit_summary_text = self.settings.get_string(settings_path)?;
-        let template = self.parse_template(
-            &language,
-            &annotate_commit_summary_text,
-            CommitTemplateLanguage::wrap_commit,
-        )?;
+        let template = self.parse_template(&language, &annotate_commit_summary_text)?;
+
+        Ok(template)
+    }
+    pub fn settings_annotation_template(
+        &self,
+        settings_path: &'static str,
+    ) -> Result<TemplateRenderer<'_, AnnotationLine>> {
+        let language = self.commit_template_language();
+        let annotate_commit_summary_text = self.settings.get_string(settings_path)?;
+        let template = self.parse_template(&language, &annotate_commit_summary_text)?;
 
         Ok(template)
     }
 
     pub fn annotation(&self, starting_commit: &Commit, file_path: &str) -> Result<FileAnnotation> {
         let file_path = self.path_converter.parse_file_path(file_path)?;
-        let file_value = starting_commit.tree()?.path_value(&file_path)?;
+        let file_value = starting_commit.tree().path_value(&file_path)?;
         let ui_path = self.path_converter.format_file_path(&file_path);
         if file_value.is_absent() {
             return Err(anyhow!("Path does not belong to repository: {ui_path}"));
@@ -173,12 +186,11 @@ impl Repo {
         }
 
         let domain = RevsetExpression::all();
-        let annotation = jj_lib::annotate::get_annotation_for_file(
-            self.repo.as_ref(),
-            starting_commit,
-            &domain,
-            &file_path,
-        )?;
+
+        let mut annotator = FileAnnotator::from_commit(starting_commit, &file_path)?;
+        annotator.compute(self.repo.as_ref(), &domain)?;
+        annotator.to_annotation();
+        let annotation = annotator.to_annotation();
 
         Ok(annotation)
     }
@@ -198,9 +210,7 @@ impl Repo {
     pub fn revset_expression(&self, revset_string: &str) -> Result<RevsetExpressionEvaluator<'_>> {
         let mut diagnostics = RevsetDiagnostics::new();
         let context = self.revset_parse_context();
-        let (expression, modifier) =
-            revset::parse_with_modifier(&mut diagnostics, revset_string, &context)?;
-        let (None | Some(RevsetModifier::All)) = modifier;
+        let expression = revset::parse(&mut diagnostics, revset_string, &context)?;
 
         ensure!(diagnostics.is_empty());
 
@@ -224,7 +234,7 @@ impl Repo {
         let commit_id = self
             .repo
             .view()
-            .get_wc_commit_id(self.workspace.workspace_id())
+            .get_wc_commit_id(self.workspace.workspace_name())
             .ok_or_else(|| anyhow!("workspace has no checked out commit"))?;
         let commit = self.repo.store().get_commit(commit_id)?;
 
@@ -233,7 +243,7 @@ impl Repo {
 
     pub fn diff(&self, commit: &Commit) -> Result<DiffState<'_>> {
         let from_tree = commit.parent_tree(self.repo.as_ref())?;
-        let to_tree = commit.tree()?;
+        let to_tree = commit.tree();
 
         let mut copy_records = CopyRecords::default();
         for parent_id in commit.parent_ids() {
@@ -249,8 +259,10 @@ impl Repo {
         Ok(DiffState {
             repo: self,
             copy_records,
-            from_tree,
-            to_tree,
+            tree: Diff {
+                before: from_tree,
+                after: to_tree,
+            },
         })
     }
 
@@ -262,43 +274,50 @@ impl Repo {
 impl DiffState<'_> {
     pub fn diff(&self, matcher: &dyn Matcher) -> Result<Vec<MaterializedTreeDiffEntry>> {
         let diff =
-            self.from_tree
-                .diff_stream_with_copies(&self.to_tree, matcher, &self.copy_records);
-        let diff = block_on_stream(materialized_diff_stream(self.repo.repo.store(), diff))
-            .collect::<Vec<_>>();
+            self.tree
+                .before
+                .diff_stream_with_copies(&self.tree.after, matcher, &self.copy_records);
+        let diff = block_on_stream(materialized_diff_stream(
+            self.repo.repo.store(),
+            diff,
+            self.tree.as_ref().map(|tree| tree.labels()),
+        ))
+        .collect::<Vec<_>>();
 
         Ok(diff)
     }
 
     pub fn write_summary(&self, f: &mut dyn Formatter) -> Result<()> {
-        let diff = self.from_tree.diff_stream_with_copies(
-            &self.to_tree,
+        let diff = self.tree.before.diff_stream_with_copies(
+            &self.tree.after,
             &EverythingMatcher,
             &self.copy_records,
         );
 
-        show_diff_summary(f, diff, &self.repo.path_converter)?;
+        futures_executor::block_on(show_diff_summary(f, diff, &self.repo.path_converter))?;
 
         Ok(())
     }
 
     pub fn write_diff(&self, f: &mut dyn Formatter, matcher: &dyn Matcher) -> Result<()> {
         let diff =
-            self.from_tree
-                .diff_stream_with_copies(&self.to_tree, matcher, &self.copy_records);
+            self.tree
+                .before
+                .diff_stream_with_copies(&self.tree.after, matcher, &self.copy_records);
 
-        jj_cli::diff_util::show_git_diff(
+        futures_executor::block_on(jj_cli::diff_util::show_git_diff(
             f,
             self.repo.repo.store(),
             diff,
+            self.tree.as_ref().map(|tree| tree.labels()),
             &UnifiedDiffOptions {
                 context: 3,
                 line_diff: diff_util::LineDiffOptions {
-                    compare_mode: diff_util::LineCompareMode::IgnoreAllSpace,
+                    compare_mode: LineCompareMode::IgnoreAllSpace,
                 },
             },
             ConflictMarkerStyle::Git,
-        )?;
+        ))?;
 
         Ok(())
     }
@@ -309,7 +328,7 @@ impl Repo {
         CommitTemplateLanguage::new(
             self.repo.as_ref(),
             &self.path_converter,
-            self.workspace.workspace_id(),
+            self.workspace.workspace_name(),
             self.revset_parse_context(),
             &self.id_prefix_context,
             self.immutable_expression(),
@@ -320,25 +339,28 @@ impl Repo {
         )
     }
 
-    fn immutable_expression(&self) -> Rc<UserRevsetExpression> {
+    fn immutable_expression(&self) -> Arc<UserRevsetExpression> {
         // Negated ancestors expression `~::(<heads> | root())` is slightly
         // easier to optimize than negated union `~(::<heads> | root())`.
         self.immutable_heads_expression.ancestors()
     }
 
-    pub fn parse_template<'a, C: Clone + 'a, L: TemplateLanguage<'a> + ?Sized>(
+    pub fn parse_template<'a, C, L>(
         &self,
         language: &L,
         template_text: &str,
-        wrap_self: impl Fn(PropertyPlaceholder<C>) -> L::Property,
-    ) -> Result<TemplateRenderer<'a, C>> {
+    ) -> Result<TemplateRenderer<'a, C>>
+    where
+        C: Clone + 'a,
+        L: TemplateLanguage<'a> + ?Sized,
+        L::Property: WrapTemplateProperty<'a, C>,
+    {
         let mut diagnostics = TemplateDiagnostics::new();
         let template = template_builder::parse(
             language,
             &mut diagnostics,
             template_text,
             &self.template_aliases_map,
-            wrap_self,
         )?;
         ensure!(diagnostics.len() == 0);
         Ok(template)
@@ -346,7 +368,7 @@ impl Repo {
     fn revset_parse_context(&self) -> RevsetParseContext<'_> {
         let workspace_context = RevsetWorkspaceContext {
             path_converter: &self.path_converter,
-            workspace_id: self.workspace.workspace_id(),
+            workspace_name: self.workspace.workspace_name(),
         };
 
         let now = if let Some(timestamp) = self.settings.commit_timestamp() {
@@ -357,16 +379,19 @@ impl Repo {
             chrono::Local::now()
         };
 
-        RevsetParseContext::new(
-            &self.revset_aliases_map,
-            self.settings.user_email(),
-            now.into(),
-            &self.revset_extensions,
-            Some(workspace_context),
-        )
+        RevsetParseContext {
+            aliases_map: &self.revset_aliases_map,
+            local_variables: HashMap::default(),
+            user_email: self.settings.user_email(),
+            date_pattern_context: now.into(),
+            default_ignored_remote: self.default_ignored_remote,
+            use_glob_by_default: self.revsets_use_glob_by_default,
+            extensions: &self.revset_extensions,
+            workspace: Some(workspace_context),
+        }
     }
 
-    fn load_short_prefixes_expression(&self) -> Result<Option<Rc<UserRevsetExpression>>> {
+    fn load_short_prefixes_expression(&self) -> Result<Option<Arc<UserRevsetExpression>>> {
         let revset_string = self
             .settings
             .get_string("revsets.short-prefixes")
@@ -376,13 +401,12 @@ impl Repo {
             Ok(None)
         } else {
             let mut diagnostics = RevsetDiagnostics::new();
-            let (expression, modifier) = revset::parse_with_modifier(
+            let expression = revset::parse(
                 &mut diagnostics,
                 &revset_string,
                 &self.revset_parse_context(),
             )
             .map_err(|err| anyhow::anyhow!("Invalid `revsets.short-prefixes`: {}", err))?;
-            let (None | Some(RevsetModifier::All)) = modifier;
             Ok(Some(expression))
         }
     }
@@ -406,7 +430,7 @@ fn load_revset_aliases(stacked_config: &StackedConfig) -> Result<RevsetAliasesMa
                 .into());
             }
         };
-        for (decl, item) in table {
+        for (decl, item) in table.iter() {
             let _ = item
                 .as_str()
                 .ok_or_else(|| format!("Expected a string, but is {}", item.type_name()))
@@ -434,7 +458,7 @@ fn load_template_aliases(stacked_config: &StackedConfig) -> Result<TemplateAlias
                 .into());
             }
         };
-        for (decl, item) in table {
+        for (decl, item) in table.iter() {
             let _ = item
                 .as_str()
                 .ok_or_else(|| format!("Expected a string, but is {}", item.type_name()))
