@@ -234,16 +234,16 @@ impl LanguageServer for Backend {
                     } else {
                         start
                     };
-                    let ret = Some(SemanticToken {
+                    let ret = SemanticToken {
                         delta_line,
                         delta_start,
                         length: range.len() as u32,
                         token_type,
                         token_modifiers_bitset: 0,
-                    });
+                    };
                     pre_line = line;
                     pre_start = start;
-                    ret
+                    Some(ret)
                 })
                 .collect::<Vec<_>>();
             Some(semantic_tokens)
@@ -261,6 +261,8 @@ impl LanguageServer for Backend {
         &self,
         params: SemanticTokensRangeParams,
     ) -> Result<Option<SemanticTokensRangeResult>> {
+        trace!("semantic_token_range");
+
         let uri = params.text_document.uri.to_string();
         let semantic_tokens = || -> Option<Vec<SemanticToken>> {
             let page = self.page_map.get(&uri)?;
@@ -274,7 +276,7 @@ impl LanguageServer for Backend {
                     let line = rope.try_byte_to_line(token.0.start).ok()? as u32;
                     let first = rope.try_line_to_char(line as usize).ok()? as u32;
                     let start = rope.try_byte_to_char(token.0.start).ok()? as u32 - first;
-                    let ret = Some(SemanticToken {
+                    let ret = SemanticToken {
                         delta_line: line - prev_line,
                         delta_start: if start >= prev_start {
                             start - prev_start
@@ -284,14 +286,15 @@ impl LanguageServer for Backend {
                         length: token.0.len() as u32,
                         token_type: token.1,
                         token_modifiers_bitset: 0,
-                    });
+                    };
                     prev_line = line;
                     prev_start = start;
-                    ret
+                    Some(ret)
                 })
                 .collect::<Vec<_>>();
             Some(semantic_tokens)
         }();
+
         Ok(semantic_tokens.map(|data| {
             SemanticTokensRangeResult::Tokens(SemanticTokens {
                 result_id: None,

@@ -23,13 +23,13 @@ impl Page for Status {
         let diff_state = repo.diff(&commit)?;
         let diff = diff_state.diff(&EverythingMatcher)?;
 
-        write!(out.labelled(0), "Head: ")?;
+        write!(out.labelled(semantic_token::get("jjmagit")), "Head: ")?;
 
         repo.write_log(&mut out.formatter(), &commit)?;
         writeln!(out)?;
 
         out.push_code_action(CodeAction::move_to_commit());
-        write!(out.labelled(0), "Changes")?;
+        write!(out.labelled(semantic_token::get("jjmagit")), "Changes")?;
         out.pop_code_action();
 
         writeln!(out, " ({})", diff.len(),)?;
@@ -88,7 +88,10 @@ impl Page for Status {
         }
 
         writeln!(out)?;
-        writeln!(out.labelled(0), "Recent commits")?;
+        writeln!(
+            out.labelled(semantic_token::get("jjmagit")),
+            "Recent commits"
+        )?;
 
         let log = repo.log()?;
         for commit in log {
