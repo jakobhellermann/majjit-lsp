@@ -3,12 +3,14 @@ use crate::page_writer::PageWriter;
 use anyhow::Result;
 
 mod annotate;
+mod commit;
 mod status;
 
 pub use annotate::Annotate;
+pub use commit::Commit;
 pub use status::Status;
 
-pub const ALL: &[&dyn Page] = &[&Status, &Annotate];
+pub const ALL: &[&dyn Page] = &[&Status, &Annotate, &Commit];
 
 pub fn named(name: &str) -> Option<&'static dyn Page> {
     ALL.iter()

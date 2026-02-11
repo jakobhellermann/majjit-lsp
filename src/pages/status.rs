@@ -97,10 +97,22 @@ impl Page for Status {
         for commit in log {
             out.push_fold();
 
+            let target = GotoDefinitionTarget {
+                target: Url::from_file_path(
+                    repo.workspace_dir()
+                        .join(format!(".jj/commit/{}.jjmagit", commit.change_id())),
+                )
+                .unwrap(),
+            };
+
+            out.goto_def.push(&out.buf, target);
+
             out.push_code_actions(vec![CodeAction::new(&commit), CodeAction::abandon(&commit)]);
             repo.write_log(&mut out.formatter(), &commit)?;
             out.pop_code_action();
             // writeln!(out)?;
+
+            out.goto_def.pop(&out.buf);
 
             let diff = repo.diff(&commit)?;
             diff.write_summary(&mut out.formatter())?;
