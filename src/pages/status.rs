@@ -26,7 +26,7 @@ impl Page for Status {
         write!(out.labelled(0), "Head: ")?;
 
         repo.write_log(&mut out.formatter(), &commit)?;
-        writeln!(out, "")?;
+        writeln!(out)?;
 
         out.push_code_action(CodeAction::move_to_commit());
         write!(out.labelled(0), "Changes")?;

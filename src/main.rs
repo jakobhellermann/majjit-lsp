@@ -161,8 +161,7 @@ impl LanguageServer for Backend {
             let goto_def = page
                 .goto_def
                 .iter()
-                .filter(|(span, _)| span.contains(&offset))
-                .last();
+                .rfind(|(span, _)| span.contains(&offset));
 
             goto_def.and_then(|(range, target)| {
                 let start_position = offset_to_position(range.start, &rope)?;
@@ -220,7 +219,7 @@ impl LanguageServer for Backend {
             let page = &mut self.page_map.get_mut(&uri)?;
             let im_complete_tokens = &mut page.labels;
             let rope = self.document_map.get(&uri)?;
-            im_complete_tokens.sort_by(|a, b| a.0.start.cmp(&b.0.start));
+            im_complete_tokens.sort_by_key(|a| a.0.start);
             let mut pre_line = 0;
             let mut pre_start = 0;
             let semantic_tokens = im_complete_tokens
@@ -552,7 +551,7 @@ impl LanguageServer for Backend {
                     .ok_or_else(|| anyhow!("wrong parameter workspace: {:?}", workspace))?;
                 let page = page
                     .as_str()
-                    .and_then(|page| pages::named(page))
+                    .and_then(pages::named)
                     .ok_or_else(|| anyhow!("wrong parameter page {:?}", page))?;
                 let argument = value_as_option(file_path)
                     .map(|x| x.as_str().context("invalid parameter file_path"))
@@ -578,6 +577,7 @@ impl LanguageServer for Backend {
 }
 
 #[derive(Debug, Deserialize, Serialize)]
+#[allow(dead_code)]
 struct InlayHintParams {
     path: String,
 }

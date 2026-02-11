@@ -59,7 +59,7 @@ impl PageWriter {
                 .code_actions
                 .done
                 .into_iter()
-                .flat_map(|(range, item)| (item.into_iter().map(move |item| (range.clone(), item))))
+                .flat_map(|(range, item)| item.into_iter().map(move |item| (range.clone(), item)))
                 .collect(),
         }
     }
@@ -174,8 +174,7 @@ impl Formatter for FormatterAdapter<'_> {
 
 impl std::io::Write for PageWriter {
     fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
-        let str = std::str::from_utf8(buf)
-            .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
+        let str = std::str::from_utf8(buf).map_err(std::io::Error::other)?;
         self.buf.push_str(str);
 
         Ok(buf.len())

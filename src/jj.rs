@@ -175,7 +175,7 @@ impl Repo {
         let domain = RevsetExpression::all();
         let annotation = jj_lib::annotate::get_annotation_for_file(
             self.repo.as_ref(),
-            &starting_commit,
+            starting_commit,
             &domain,
             &file_path,
         )?;
@@ -444,7 +444,7 @@ fn load_template_aliases(stacked_config: &StackedConfig) -> Result<TemplateAlias
     Ok(aliases_map)
 }
 
-pub(super) fn evaluate_revset_to_single_commit<'a>(
+pub(super) fn evaluate_revset_to_single_commit(
     revision_str: &str,
     expression: &RevsetExpressionEvaluator<'_>,
 ) -> Result<Commit> {

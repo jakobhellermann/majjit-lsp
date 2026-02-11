@@ -49,7 +49,7 @@ pub mod path {
         match arguments {
             [] => page_path.push(format!("{}.jjmagit", page.name())),
             [rest @ .., last] => {
-                page_path.push(format!("{}", page.name()));
+                page_path.push(page.name());
                 page_path.extend(rest.iter().copied().map(encode_argument));
                 page_path.push(format!("{}.jjmagit", encode_argument(last)));
             }
@@ -65,7 +65,7 @@ pub mod path {
             .map(|c| c.as_os_str().to_str().expect("invalid utf8"));
 
         let mut found = false;
-        while let Some(component) = components.next() {
+        for component in components.by_ref() {
             if component == ".jj" {
                 found = true;
                 break;
@@ -85,7 +85,6 @@ pub mod path {
 
         let mut arguments = Vec::new();
         for argument in components {
-            let argument = argument;
             arguments.push(decode_argument(argument));
         }
 
