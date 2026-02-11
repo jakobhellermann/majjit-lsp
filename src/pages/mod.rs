@@ -23,7 +23,7 @@ pub trait Page: Send + Sync {
 }
 
 pub mod path {
-    use anyhow::{ensure, Context, Result};
+    use anyhow::{Context, Result, ensure};
     use std::path::{Path, PathBuf};
 
     use crate::pages::{self, truncate_end_matches};

@@ -1,4 +1,4 @@
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use jj_cli::templater::TemplateRenderer;
 use jj_lib::annotate::FileAnnotation;
 use jj_lib::commit::Commit;

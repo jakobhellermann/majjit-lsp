@@ -197,10 +197,8 @@ impl<T: Clone, const DISJOINT: bool> WriterStack<T, DISJOINT> {
     pub fn push(&mut self, buf: &str, data: T) {
         let offset = buf.len();
 
-        if DISJOINT {
-            if let Some((top_start, top_data)) = self.in_progress.last() {
-                self.done.push((*top_start..offset, top_data.clone()));
-            }
+        if DISJOINT && let Some((top_start, top_data)) = self.in_progress.last() {
+            self.done.push((*top_start..offset, top_data.clone()));
         }
 
         self.in_progress.push((offset, data));

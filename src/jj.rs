@@ -1,8 +1,8 @@
 use chrono::TimeZone as _;
 use futures_executor::block_on_stream;
 use jj_cli::commit_templater::{CommitTemplateLanguage, CommitTemplateLanguageExtension};
-use jj_cli::config::{config_from_environment, default_config_layers, ConfigEnv};
-use jj_cli::diff_util::{self, show_diff_summary, UnifiedDiffOptions};
+use jj_cli::config::{ConfigEnv, config_from_environment, default_config_layers};
+use jj_cli::diff_util::{self, UnifiedDiffOptions, show_diff_summary};
 use jj_cli::formatter::Formatter;
 use jj_cli::revset_util::{self, RevsetExpressionEvaluator};
 use jj_cli::template_builder::{self, TemplateLanguage};
@@ -11,7 +11,7 @@ use jj_cli::templater::{PropertyPlaceholder, TemplateRenderer};
 use jj_lib::annotate::FileAnnotation;
 use jj_lib::commit::Commit;
 use jj_lib::config::{ConfigGetError, ConfigGetResultExt, ConfigNamePathBuf, StackedConfig};
-use jj_lib::conflicts::{materialized_diff_stream, ConflictMarkerStyle, MaterializedTreeDiffEntry};
+use jj_lib::conflicts::{ConflictMarkerStyle, MaterializedTreeDiffEntry, materialized_diff_stream};
 use jj_lib::copies::CopyRecords;
 use jj_lib::id_prefix::IdPrefixContext;
 use jj_lib::matchers::{EverythingMatcher, Matcher};
@@ -29,7 +29,7 @@ use std::path::Path;
 use std::rc::Rc;
 use std::sync::Arc;
 
-use anyhow::{anyhow, ensure, Result};
+use anyhow::{Result, anyhow, ensure};
 
 pub struct Repo {
     workspace: Workspace,

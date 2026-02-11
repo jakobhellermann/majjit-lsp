@@ -1,7 +1,7 @@
 #![allow(clippy::redundant_closure_call)]
 use std::path::Path;
 
-use anyhow::{anyhow, Context};
+use anyhow::{Context, anyhow};
 use dashmap::DashMap;
 use jjmagit_language_server::jj::Repo;
 use jjmagit_language_server::page_writer::{Page, PageWriter};
