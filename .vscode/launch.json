@@ -9,15 +9,13 @@
       "runtimeExecutable": "${execPath}",
       "args": [
         // "--disable-extensions",
-        "--extensionDevelopmentPath=${workspaceRoot}/editors/vscode"
+        "--extensionDevelopmentPath=${workspaceRoot}/editors/vscode",
       ],
-      "outFiles": [
-        "${workspaceRoot}/editors/vscode/out/*.js"
-      ],
+      "outFiles": ["${workspaceRoot}/editors/vscode/out/*.js"],
       "env": {
-        "SERVER_PATH": "/home/jakob/.cache/rust/debug/jjmagit-language-server"
+        "SERVER_PATH": "/home/jakob/.cache/rust/debug/jjmagit-language-server",
       },
-      "preLaunchTask": "Build Server and Extension"
+      "preLaunchTask": "Build Server and Extension",
     },
-  ]
+  ],
 }
