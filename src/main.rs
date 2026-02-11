@@ -628,7 +628,9 @@ impl Backend {
 
 #[tokio::main]
 async fn main() {
-    env_logger::init();
+    env_logger::builder()
+        .filter_level(log::LevelFilter::Trace)
+        .init();
 
     let stdin = tokio::io::stdin();
     let stdout = tokio::io::stdout();
